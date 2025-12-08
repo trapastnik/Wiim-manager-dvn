@@ -1,0 +1,170 @@
+import express from 'express';
+import WiiMClient from './wiim-client.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Загрузка .env файла
+function loadEnv() {
+  try {
+    const envPath = join(__dirname, '.env');
+    const envFile = readFileSync(envPath, 'utf-8');
+    const lines = envFile.split('\n');
+    
+    lines.forEach(line => {
+      line = line.trim();
+      if (line && !line.startsWith('#')) {
+        const [key, ...valueParts] = line.split('=');
+        const value = valueParts.join('=').trim();
+        process.env[key.trim()] = value;
+      }
+    });
+  } catch (error) {
+    console.log('Warning: .env file not found, using defaults');
+  }
+}
+
+loadEnv();
+
+const app = express();
+app.use(express.json());
+app.use(express.static('public'));
+
+// Конфигурация
+const WIIM_IP = process.env.WIIM_IP || '192.168.1.156';
+const PORT = process.env.PORT || 3000;
+const USE_HTTPS = process.env.WIIM_USE_HTTPS !== 'false';
+
+const wiimClient = new WiiMClient(WIIM_IP, USE_HTTPS);
+
+console.log('=== WiiM Web Control ===');
+console.log('WIIM_IP:', WIIM_IP);
+console.log('PORT:', PORT);
+console.log('USE_HTTPS:', USE_HTTPS);
+
+// API endpoints
+
+// Получение статуса
+app.get('/api/status', async (req, res) => {
+  try {
+    const status = await wiimClient.getPlayerStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Получение расширенной информации
+app.get('/api/info', async (req, res) => {
+  try {
+    const info = await wiimClient.getStatusInfo();
+    res.json(info);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Управление воспроизведением
+app.post('/api/control/play', async (req, res) => {
+  try {
+    const result = await wiimClient.play();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/control/pause', async (req, res) => {
+  try {
+    const result = await wiimClient.pause();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/control/stop', async (req, res) => {
+  try {
+    const result = await wiimClient.stop();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/control/next', async (req, res) => {
+  try {
+    const result = await wiimClient.next();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/control/prev', async (req, res) => {
+  try {
+    const result = await wiimClient.prev();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Управление громкостью
+app.post('/api/volume/set', async (req, res) => {
+  try {
+    const { volume } = req.body;
+    if (volume === undefined) {
+      return res.status(400).json({ error: 'Volume parameter required' });
+    }
+    const result = await wiimClient.setVolume(volume);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/volume/up', async (req, res) => {
+  try {
+    const result = await wiimClient.volumeUp();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/volume/down', async (req, res) => {
+  try {
+    const result = await wiimClient.volumeDown();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/volume/mute', async (req, res) => {
+  try {
+    const result = await wiimClient.mute();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/volume/unmute', async (req, res) => {
+  try {
+    const result = await wiimClient.unmute();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Запуск сервера
+app.listen(PORT, () => {
+  console.log(`WiiM Web Control running on http://localhost:${PORT}`);
+  console.log(`Connecting to WiiM at: ${USE_HTTPS ? 'https' : 'http'}://${WIIM_IP}`);
+});

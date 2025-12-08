@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WiiM Control Center</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="main-layout">
+        <div class="container">
+            <header>
+                <h1>WiiM Control Center</h1>
+                <div class="header-controls">
+                    <button id="enable-demo-btn" class="btn btn-demo" onclick="enableDemoMode(); startDemoAnimation()">🎭 Демо-режим</button>
+                    <button id="disable-demo-btn" class="btn btn-demo-exit" onclick="disableDemoMode()" style="display:none">✕ Выйти из демо</button>
+                    <div id="connection-status" class="status offline">●</div>
+                </div>
+            </header>
+
+            <!-- Табы -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('player')">Плеер</button>
+                <button class="tab" onclick="switchTab('players')">Устройства</button>
+                <button class="tab" onclick="switchTab('media')">Медиа</button>
+                <button class="tab" onclick="switchTab('diagnostics')">Диагностика</button>
+                <button class="tab" onclick="switchTab('settings')">⚙️ Настройки</button>
+            </div>
+
+        <!-- Вкладка: Плеер -->
+        <div id="tab-player" class="tab-content active">
+            <!-- Глобальные кнопки управления -->
+            <div class="global-controls">
+                <button class="btn btn-success" onclick="playAll()">▶ Запустить все</button>
+                <button class="btn btn-danger" onclick="stopAll()">⏹ Остановить все</button>
+                <button class="btn btn-secondary" onclick="toggleLoopModeAll()" id="loop-all-btn">🔁 Режим повтора (все)</button>
+                <button class="btn btn-primary" onclick="refreshAllPlayers()">🔄 Обновить статусы</button>
+            </div>
+
+            <!-- Управление группами -->
+            <div class="group-management">
+                <h3>📁 Группы плееров</h3>
+                <div class="group-actions">
+                    <button class="btn btn-success" onclick="createPlayerGroup()" id="create-group-btn" disabled>✓ Создать группу</button>
+                    <button class="btn btn-secondary" onclick="clearPlayerSelection()" id="clear-selection-btn" style="display:none">✕ Сбросить выбор</button>
+                </div>
+                <div id="player-groups-list" class="player-groups-list">
+                    <p class="empty-state">Нет сохранённых групп. Выберите плееры галочками и создайте группу.</p>
+                </div>
+            </div>
+
+            <!-- Список плееров с индивидуальным управлением -->
+            <h3>🎵 Все плееры</h3>
+            <div id="multi-players-list" class="multi-players-list">
+                <p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>
+            </div>
+        </div>
+
+        <!-- Вкладка: Устройства -->
+        <div id="tab-players" class="tab-content">
+            <div class="section-header">
+                <h2>Мои плееры</h2>
+                <div>
+                    <button class="btn btn-primary" onclick="scanPlayers()">🔍 Сканировать сеть</button>
+                    <button class="btn btn-secondary" onclick="showAddPlayer()">+ Добавить вручную</button>
+                </div>
+            </div>
+
+            <div id="add-player-form" class="add-form" style="display:none;">
+                <h3>Добавить плеер</h3>
+                <input type="text" id="player-ip" placeholder="IP адрес (192.168.1.xxx)">
+                <input type="text" id="player-name" placeholder="Название (опц.)">
+                <div>
+                    <button class="btn btn-primary" onclick="addPlayerManual()">Добавить</button>
+                    <button class="btn btn-secondary" onclick="hideAddPlayer()">Отмена</button>
+                </div>
+            </div>
+
+            <div id="players-list" class="players-list">
+                <p class="empty-state">Нет плееров. Используйте сканер или добавьте вручную.</p>
+            </div>
+        </div>
+
+        <!-- Вкладка: Медиа -->
+        <div id="tab-media" class="tab-content">
+            <div class="section-header">
+                <h2>Медиа библиотека</h2>
+                <button class="btn btn-primary" onclick="document.getElementById('file-upload').click()">📁 Загрузить файл</button>
+                <input type="file" id="file-upload" accept="audio/*" style="display:none" onchange="uploadFile(this.files[0])">
+            </div>
+
+            <div id="media-list" class="media-list">
+                <p class="empty-state">Нет файлов. Загрузите аудио файлы.</p>
+            </div>
+        </div>
+
+        <!-- Вкладка: Диагностика -->
+        <div id="tab-diagnostics" class="tab-content">
+            <div class="section-header">
+                <h2>📊 Диагностика сервера</h2>
+                <button class="btn btn-secondary" onclick="refreshDiagnostics()">🔄 Обновить</button>
+            </div>
+
+            <div id="diagnostics-list" class="diagnostics-list">
+                <p class="empty-state">Загрузка статистики...</p>
+            </div>
+        </div>
+
+        <!-- Вкладка: Настройки -->
+        <div id="tab-settings" class="tab-content">
+            <div class="section-header">
+                <h2>⚙️ Настройки системы</h2>
+            </div>
+
+            <!-- Секция: Режим повтора -->
+            <div class="settings-section">
+                <h3>🔁 Настройки режима повтора</h3>
+                <p class="settings-description">
+                    Предиктивный перезапуск позволяет плавно повторять треки без пауз.
+                    Команда воспроизведения отправляется ДО окончания трека.
+                </p>
+
+                <div class="settings-row">
+                    <div class="settings-item">
+                        <label for="loop-threshold">
+                            <strong>Порог перезапуска (мс)</strong>
+                            <span class="settings-help">За сколько миллисекунд до конца трека отправлять команду play</span>
+                        </label>
+                        <div class="settings-control">
+                            <input type="number" id="loop-threshold" min="500" max="10000" step="100" value="2000">
+                            <span class="settings-value"><span id="loop-threshold-display">2000</span> мс (<span id="loop-threshold-seconds">2.0</span> сек)</span>
+                        </div>
+                        <div class="settings-hint">
+                            Рекомендуется: 2000-3000 мс. Меньше = короче, но рискованнее. Больше = безопаснее, но может обрывать трек.
+                        </div>
+                    </div>
+
+                    <div class="settings-item">
+                        <label for="loop-reset-threshold">
+                            <strong>Порог обнаружения старта (мс)</strong>
+                            <span class="settings-help">Когда считать, что трек начался заново (для сброса флага перезапуска)</span>
+                        </label>
+                        <div class="settings-control">
+                            <input type="number" id="loop-reset-threshold" min="1000" max="15000" step="1000" value="5000">
+                            <span class="settings-value"><span id="loop-reset-display">5000</span> мс (<span id="loop-reset-seconds">5.0</span> сек)</span>
+                        </div>
+                        <div class="settings-hint">
+                            Рекомендуется: 5000 мс (первые 5 секунд трека). Если флаг не сбрасывается, увеличьте значение.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button class="btn btn-primary" onclick="saveSettings()">💾 Сохранить настройки</button>
+                    <button class="btn btn-secondary" onclick="resetSettings()">🔄 Сбросить к значениям по умолчанию</button>
+                </div>
+            </div>
+
+            <!-- Секция: Информация -->
+            <div class="settings-section">
+                <h3>ℹ️ Информация о системе</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label">Версия:</span>
+                        <span class="info-value">3.4</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Интервал обновления:</span>
+                        <span class="info-value">3000 мс (3 секунды)</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Плееров подключено:</span>
+                        <span class="info-value" id="info-players-count">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">Медиа файлов:</span>
+                        <span class="info-value" id="info-media-count">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Боковая панель системных сообщений -->
+        <div class="messages-panel" id="messages-panel">
+            <div class="resize-handle" id="resize-handle"></div>
+            <div class="messages-header">
+                <h2>📝 Системные сообщения</h2>
+            </div>
+
+            <div class="system-messages" id="system-messages">
+                <div class="message-item">Ожидание подключения...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно сканирования -->
+    <div id="scan-modal" class="modal">
+        <div class="modal-content">
+            <h3>🔍 Сканирование сети</h3>
+            <div id="scan-progress">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p id="scan-status">Подготовка к сканированию...</p>
+            </div>
+            <div id="scan-results" style="display:none;">
+                <h4>Найденные устройства:</h4>
+                <div id="scan-results-list"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="scan-close-btn" class="btn btn-secondary" onclick="closeScanModal()" disabled>Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

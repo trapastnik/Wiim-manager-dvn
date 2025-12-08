@@ -1,0 +1,50 @@
+{
+  "files": [
+    {
+      "id": "1765096546830",
+      "name": "Elegia.mp3",
+      "filename": "680053383da6fb17888d077c52cf0aef",
+      "path": "/media/680053383da6fb17888d077c52cf0aef",
+      "size": 9990797,
+      "mimetype": "audio/mpeg",
+      "addedAt": "2025-12-07T08:35:46.830Z"
+    },
+    {
+      "id": "1765096549674",
+      "name": "Gal.mp3",
+      "filename": "a51a2b10c9447954dee93bc231179c06",
+      "path": "/media/a51a2b10c9447954dee93bc231179c06",
+      "size": 14628159,
+      "mimetype": "audio/mpeg",
+      "addedAt": "2025-12-07T08:35:49.674Z"
+    },
+    {
+      "id": "1765096554280",
+      "name": "Output 1-2-1.mp3",
+      "filename": "fa52e342bb57deef536ec75e6a9326b7",
+      "path": "/media/fa52e342bb57deef536ec75e6a9326b7",
+      "size": 13286656,
+      "mimetype": "audio/mpeg",
+      "addedAt": "2025-12-07T08:35:54.280Z"
+    },
+    {
+      "id": "1765096557199",
+      "name": "Output 1-2.mp3",
+      "filename": "fa558ba573ee9d22124c491ff70f0521",
+      "path": "/media/fa558ba573ee9d22124c491ff70f0521",
+      "size": 13286656,
+      "mimetype": "audio/mpeg",
+      "addedAt": "2025-12-07T08:35:57.199Z"
+    },
+    {
+      "id": "1765096566915",
+      "name": "Output 1-2 tick2.mp3",
+      "filename": "060558ca8349c09fd26c0d9ba3090520",
+      "path": "/media/060558ca8349c09fd26c0d9ba3090520",
+      "size": 5606656,
+      "mimetype": "audio/mpeg",
+      "addedAt": "2025-12-07T08:36:06.915Z"
+    }
+  ],
+  "playlists": []
+}

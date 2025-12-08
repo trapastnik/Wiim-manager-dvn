@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(ping:*)",
+      "Bash(curl:*)",
+      "Bash(node scan.js:*)",
+      "Bash(chmod:*)",
+      "Bash(mkdir:*)",
+      "Bash(tree:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

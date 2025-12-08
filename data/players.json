@@ -1,0 +1,47 @@
+{
+  "players": [
+    {
+      "id": "1765110234099_gbngjjbq6",
+      "ip": "192.168.0.2",
+      "name": "Naff-Naff",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:23:54.099Z"
+    },
+    {
+      "id": "1765110234100_0ica103ra",
+      "ip": "192.168.0.7",
+      "name": "Nuff-Nuff",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:23:54.100Z"
+    },
+    {
+      "id": "1765110234101_1cqs5d2m5",
+      "ip": "192.168.0.15",
+      "name": "Niff-niff",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:23:54.101Z"
+    },
+    {
+      "id": "1765110234101_1cj0xs3sc",
+      "ip": "192.168.0.37",
+      "name": "McGonagall",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:23:54.101Z"
+    },
+    {
+      "id": "1765110274113_e42dqe7g1",
+      "ip": "192.168.0.3",
+      "name": "Moony",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:24:34.113Z"
+    },
+    {
+      "id": "1765110274114_uouabkszd",
+      "ip": "192.168.0.20",
+      "name": "Snape",
+      "useHttps": true,
+      "addedAt": "2025-12-07T12:24:34.114Z"
+    }
+  ],
+  "activePlayer": "1765110234099_gbngjjbq6"
+}

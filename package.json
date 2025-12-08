@@ -1,0 +1,18 @@
+{
+  "name": "wiim-web-control",
+  "version": "2.0.0",
+  "description": "Web interface for WiiM Mini player control",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": ["wiim", "media-player", "control"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1"
+  }
+}
