@@ -1,0 +1,22 @@
+{
+  "networks": [
+    {
+      "ssid": "Home_WiFi",
+      "password": "your_password_here",
+      "priority": 100,
+      "description": "Домашняя сеть - наивысший приоритет"
+    },
+    {
+      "ssid": "Office_WiFi",
+      "password": "office_password",
+      "priority": 80,
+      "description": "Офисная сеть"
+    },
+    {
+      "ssid": "Mobile_Hotspot",
+      "password": "mobile_pass",
+      "priority": 50,
+      "description": "Мобильная точка доступа"
+    }
+  ]
+}

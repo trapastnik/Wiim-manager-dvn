@@ -1,0 +1,23 @@
+[Unit]
+Description=WiiM Web Control Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/wiim
+ExecStartPre=/home/pi/wiim/wifi-connect.sh
+ExecStart=/usr/bin/node /home/pi/wiim/server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+Environment=NODE_ENV=production
+
+# Автоматический перезапуск при изменении сети
+RestartForceExitStatus=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
