@@ -3,6 +3,7 @@ import multer from 'multer';
 import WiiMClient from './wiim-client.js';
 import NetworkScanner from './network-scanner.js';
 import storage from './storage.js';
+import serverInfo from './server-info.js';
 import { readFileSync, readdirSync, statSync, unlinkSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -734,27 +735,62 @@ app.post('/api/players/:id/loopmode', async (req, res) => {
 
 // API ENDPOINT - SERVER INFO
 
-app.get('/api/server-info', (req, res) => {
-  const nets = networkInterfaces();
-  const addresses = [];
+app.get('/api/server-info', async (req, res) => {
+  try {
+    const nets = networkInterfaces();
+    const addresses = [];
 
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      // Пропускаем внутренние и non-IPv4 адреса
-      if (net.family === 'IPv4' && !net.internal) {
-        addresses.push({
-          name: name,
-          address: net.address
-        });
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        // Пропускаем внутренние и non-IPv4 адреса
+        if (net.family === 'IPv4' && !net.internal) {
+          addresses.push({
+            name: name,
+            address: net.address
+          });
+        }
       }
     }
-  }
 
-  res.json({
-    port: PORT,
-    addresses: addresses,
-    primaryAddress: addresses.length > 0 ? addresses[0].address : 'localhost'
-  });
+    // Получаем информацию о WiFi сервера
+    const serverStatus = await serverInfo.getServerStatus();
+
+    res.json({
+      port: PORT,
+      addresses: addresses,
+      primaryAddress: addresses.length > 0 ? addresses[0].address : 'localhost',
+      server: serverStatus
+    });
+  } catch (error) {
+    console.error('[SERVER-INFO] Error:', error);
+    // Fallback на базовую информацию
+    const nets = networkInterfaces();
+    const addresses = [];
+
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        if (net.family === 'IPv4' && !net.internal) {
+          addresses.push({
+            name: name,
+            address: net.address
+          });
+        }
+      }
+    }
+
+    res.json({
+      port: PORT,
+      addresses: addresses,
+      primaryAddress: addresses.length > 0 ? addresses[0].address : 'localhost',
+      server: {
+        wifi: {
+          ssid: 'N/A',
+          signal: 'N/A',
+          error: error.message
+        }
+      }
+    });
+  }
 });
 
 // API ENDPOINT - SERVER STATS

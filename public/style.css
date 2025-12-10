@@ -1691,3 +1691,71 @@ h1 {
     font-weight: 600;
     color: #1f2937;
 }
+
+/* === Server WiFi Info === */
+
+.server-info-grid,
+.server-wifi-grid {
+    display: grid;
+    gap: 12px;
+    padding: 15px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.server-info-item,
+.server-wifi-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.server-info-item:last-child,
+.server-wifi-item:last-child {
+    border-bottom: none;
+}
+
+.server-info-label,
+.server-wifi-label {
+    font-weight: 500;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.server-info-value,
+.server-wifi-value {
+    font-weight: 600;
+    color: #1f2937;
+    font-size: 14px;
+}
+
+/* WiFi Signal Quality Colors */
+.server-wifi-value.signal-excellent {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.server-wifi-value.signal-good {
+    color: #059669;
+    font-weight: 700;
+}
+
+.server-wifi-value.signal-fair {
+    color: #f59e0b;
+    font-weight: 700;
+}
+
+.server-wifi-value.signal-poor {
+    color: #ef4444;
+    font-weight: 700;
+}
+
+.stats-half h4 {
+    color: #374151;
+    font-size: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e5e7eb;
+}

@@ -1809,8 +1809,18 @@ async function refreshDiagnostics() {
     if (currentTab !== 'diagnostics') return;
 
     try {
-        const response = await fetch('/api/stats');
-        serverStatsData = await response.json();
+        // Получаем статистику и информацию о сервере параллельно
+        const [statsRes, serverInfoRes] = await Promise.all([
+            fetch('/api/stats'),
+            fetch('/api/server-info')
+        ]);
+
+        serverStatsData = await statsRes.json();
+        const serverInfo = await serverInfoRes.json();
+
+        // Добавляем информацию о сервере к статистике
+        serverStatsData.serverInfo = serverInfo;
+
         renderServerStats();
     } catch (error) {
         console.error('Ошибка загрузки статистики:', error);
@@ -1931,6 +1941,112 @@ function renderServerStats() {
                     <div class="stats-memory-item">
                         <span class="stats-memory-label">Heap max:</span>
                         <span class="stats-memory-value">${formatBytes(stats.memory.heapTotal)}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        ${renderServerWiFiInfo()}
+    `;
+}
+
+// Отображение WiFi информации сервера
+function renderServerWiFiInfo() {
+    const serverInfo = serverStatsData.serverInfo;
+    if (!serverInfo || !serverInfo.server) {
+        return '';
+    }
+
+    const wifi = serverInfo.server.wifi;
+    const server = serverInfo.server;
+
+    // Определяем качество сигнала
+    let signalClass = 'good';
+    let signalQuality = 'Отлично';
+
+    if (wifi.signal && wifi.signal !== 'N/A') {
+        const rssi = parseInt(wifi.signal);
+        if (rssi >= -50) {
+            signalClass = 'excellent';
+            signalQuality = 'Отлично';
+        } else if (rssi >= -60) {
+            signalClass = 'good';
+            signalQuality = 'Хорошо';
+        } else if (rssi >= -70) {
+            signalClass = 'fair';
+            signalQuality = 'Средне';
+        } else {
+            signalClass = 'poor';
+            signalQuality = 'Плохо';
+        }
+    }
+
+    // Форматируем uptime сервера
+    let uptimeStr = 'N/A';
+    if (server.uptime) {
+        const uptimeSeconds = Math.floor(server.uptime);
+        const hours = Math.floor(uptimeSeconds / 3600);
+        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+        uptimeStr = `${hours}ч ${minutes}м`;
+    }
+
+    // Форматируем память
+    let memoryStr = 'N/A';
+    if (server.memory) {
+        const usedPercent = ((server.memory.used / server.memory.total) * 100).toFixed(1);
+        memoryStr = `${server.memory.used} MB / ${server.memory.total} MB (${usedPercent}%)`;
+    }
+
+    return `
+        <div class="stats-section">
+            <h3>🖥️ Сервер (${server.platform} ${server.arch})</h3>
+            <div class="stats-row">
+                <div class="stats-half">
+                    <div class="server-info-grid">
+                        <div class="server-info-item">
+                            <span class="server-info-label">Node.js:</span>
+                            <span class="server-info-value">${server.nodeVersion || 'N/A'}</span>
+                        </div>
+                        <div class="server-info-item">
+                            <span class="server-info-label">Uptime:</span>
+                            <span class="server-info-value">${uptimeStr}</span>
+                        </div>
+                        <div class="server-info-item">
+                            <span class="server-info-label">Память:</span>
+                            <span class="server-info-value">${memoryStr}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stats-half">
+                    <h4 style="margin-top: 0;">📡 WiFi Сервера</h4>
+                    <div class="server-wifi-grid">
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">Интерфейс:</span>
+                            <span class="server-wifi-value">${wifi.interface || 'N/A'}</span>
+                        </div>
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">SSID:</span>
+                            <span class="server-wifi-value">${wifi.ssid || 'N/A'}</span>
+                        </div>
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">IP адрес:</span>
+                            <span class="server-wifi-value">${wifi.ip || 'N/A'}</span>
+                        </div>
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">Сигнал:</span>
+                            <span class="server-wifi-value signal-${signalClass}">
+                                ${wifi.signal || 'N/A'}
+                                ${wifi.signal !== 'N/A' ? `(${signalQuality})` : ''}
+                            </span>
+                        </div>
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">Частота:</span>
+                            <span class="server-wifi-value">${wifi.frequency || 'N/A'}</span>
+                        </div>
+                        <div class="server-wifi-item">
+                            <span class="server-wifi-label">Скорость:</span>
+                            <span class="server-wifi-value">${wifi.bitrate || 'N/A'}</span>
+                        </div>
                     </div>
                 </div>
             </div>
