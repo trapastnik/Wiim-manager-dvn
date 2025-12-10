@@ -58,6 +58,8 @@ const upload = multer({
 // Конфигурация
 const PORT = process.env.PORT || 3000;
 const USE_HTTPS = process.env.WIIM_USE_HTTPS !== 'false';
+const REQUEST_TIMEOUT = parseInt(process.env.WIIM_REQUEST_TIMEOUT) || 5000;
+const ENABLE_STATS = process.env.ENABLE_STATS === 'true';
 
 // Мапа клиентов для каждого плеера
 const playerClients = new Map();
@@ -80,39 +82,44 @@ const serverStats = {
   activeStreams: 0
 };
 
-// Middleware для подсчета статистики
-app.use((req, res, next) => {
-  serverStats.requests.total++;
+// Middleware для подсчета статистики (опционально, можно отключить для производительности)
+if (ENABLE_STATS) {
+  console.log('📊 Статистика сервера ВКЛЮЧЕНА (ENABLE_STATS=true)');
+  app.use((req, res, next) => {
+    serverStats.requests.total++;
 
-  // Подсчет по категориям
-  if (req.path.includes('/status') || req.path.includes('/info')) serverStats.requests.status++;
-  else if (req.path.includes('/control') || req.path.includes('/volume')) serverStats.requests.control++;
-  else if (req.path.includes('/media')) serverStats.requests.media++;
-  else if (req.path.includes('/players')) serverStats.requests.players++;
+    // Подсчет по категориям
+    if (req.path.includes('/status') || req.path.includes('/info')) serverStats.requests.status++;
+    else if (req.path.includes('/control') || req.path.includes('/volume')) serverStats.requests.control++;
+    else if (req.path.includes('/media')) serverStats.requests.media++;
+    else if (req.path.includes('/players')) serverStats.requests.players++;
 
-  // Подсчет трафика
-  const startTime = Date.now();
-  const originalSend = res.send;
+    // Подсчет трафика
+    const startTime = Date.now();
+    const originalSend = res.send;
 
-  res.send = function(data) {
-    const responseSize = Buffer.byteLength(JSON.stringify(data));
-    serverStats.traffic.sent += responseSize;
-    return originalSend.call(this, data);
-  };
+    res.send = function(data) {
+      const responseSize = Buffer.byteLength(JSON.stringify(data));
+      serverStats.traffic.sent += responseSize;
+      return originalSend.call(this, data);
+    };
 
-  if (req.body) {
-    serverStats.traffic.received += Buffer.byteLength(JSON.stringify(req.body));
-  }
+    if (req.body) {
+      serverStats.traffic.received += Buffer.byteLength(JSON.stringify(req.body));
+    }
 
-  next();
-});
+    next();
+  });
+} else {
+  console.log('⚡ Статистика сервера ОТКЛЮЧЕНА для максимальной производительности');
+}
 
 // Инициализация клиентов из сохраненных плееров
 const initializePlayers = () => {
   const data = storage.getPlayers();
   console.log('=== Инициализация плееров ===');
   data.players.forEach(player => {
-    playerClients.set(player.id, new WiiMClient(player.ip, USE_HTTPS));
+    playerClients.set(player.id, new WiiMClient(player.ip, USE_HTTPS, REQUEST_TIMEOUT));
     console.log(`  ID: ${player.id} → IP: ${player.ip} → Имя: ${player.name}`);
   });
   console.log(`Загружено плееров: ${data.players.length}`);
@@ -131,6 +138,8 @@ const getActiveClient = () => {
 console.log('=== WiiM Web Control ===');
 console.log('PORT:', PORT);
 console.log('USE_HTTPS:', USE_HTTPS);
+console.log('REQUEST_TIMEOUT:', REQUEST_TIMEOUT + 'ms');
+console.log('ENABLE_STATS:', ENABLE_STATS);
 
 // API ENDPOINTS - PLAYERS
 
@@ -185,7 +194,7 @@ app.post('/api/players/scan', async (req, res) => {
       const playersData = storage.getPlayers();
       const addedPlayer = playersData.players.find(p => p.ip === device.ip);
       if (addedPlayer) {
-        playerClients.set(addedPlayer.id, new WiiMClient(device.ip, USE_HTTPS));
+        playerClients.set(addedPlayer.id, new WiiMClient(device.ip, USE_HTTPS, REQUEST_TIMEOUT));
       }
     });
 
@@ -214,7 +223,7 @@ app.post('/api/players', (req, res) => {
     const playersData = storage.getPlayers();
     const addedPlayer = playersData.players.find(p => p.ip === ip);
     if (addedPlayer) {
-      playerClients.set(addedPlayer.id, new WiiMClient(ip, useHttps !== undefined ? useHttps : USE_HTTPS));
+      playerClients.set(addedPlayer.id, new WiiMClient(ip, useHttps !== undefined ? useHttps : USE_HTTPS, REQUEST_TIMEOUT));
     }
     
     res.json({ success: true });
@@ -464,8 +473,28 @@ app.get('/api/players/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    const info = await client.getStatusInfo();
-    console.log(`[STATUS] Player ${id}: status=${info.data?.status}`);
+    // Получаем данные о воспроизведении (status, title, artist, curpos, totlen)
+    const playerStatus = await client.getPlayerStatus();
+
+    // Получаем расширенную информацию (WiFi: essid, RSSI, BSSID)
+    const statusEx = await client.getStatusInfo();
+
+    // Объединяем данные: основа - статус воспроизведения, дополнение - WiFi информация
+    const combinedData = {
+      ...playerStatus.data,
+      essid: statusEx.data?.essid,
+      RSSI: statusEx.data?.RSSI,
+      BSSID: statusEx.data?.BSSID,
+      wlanSnr: statusEx.data?.wlanSnr,
+      DeviceName: statusEx.data?.DeviceName
+    };
+
+    const info = {
+      status: playerStatus.status,
+      data: combinedData
+    };
+
+    console.log(`[STATUS] Player ${id}: status=${info.data?.status}, RSSI=${info.data?.RSSI}, SSID=${info.data?.essid}`);
     res.json(info);
   } catch (error) {
     console.error(`[STATUS ERROR] Player ${id}:`, error.message);
@@ -515,18 +544,26 @@ app.post('/api/players/:id/play', async (req, res) => {
       logWithMs(`[PLAY] Player ${id}: WiiM API responded (took: ${t2-t1}ms, total: ${t2-t0}ms)`);
       logWithMs(`[PLAY] Player ${id}: HTTP Status=${result.status}, Data=${JSON.stringify(result.data)}`);
 
-      // СРАЗУ после получения ответа запрашиваем статус плеера
-      const t2a = Date.now();
-      logWithMs(`[PLAY] Player ${id}: Requesting immediate status check (offset: ${t2a-t0}ms)`);
+      // НЕМЕДЛЕННО отправляем ответ клиенту для максимальной синхронности группы
+      const t3 = Date.now();
+      logWithMs(`[PLAY] Player ${id}: Sending response to client (total: ${t3-t0}ms)`);
+      res.json({ ...result, _debug: { command, fileUrl, playerId: id, timing: { total: t3-t0, apiCall: t2-t1 } } });
 
-      try {
-        const statusResult = await client.getPlayerStatus();
-        const t2b = Date.now();
-        logWithMs(`[PLAY] Player ${id}: Immediate status received (took: ${t2b-t2a}ms)`);
-        logWithMs(`[PLAY] Player ${id}: Immediate Status - HTTP=${statusResult.status}, status=${statusResult.data?.status}, title=${statusResult.data?.Title}, curpos=${statusResult.data?.curpos}`);
-      } catch (err) {
-        logWithMs(`[PLAY] Player ${id}: Immediate status check failed: ${err.message}`);
-      }
+      // Проверяем статус АСИНХРОННО (не блокируя ответ клиенту)
+      // Fire-and-forget - для диагностики
+      setImmediate(async () => {
+        const t2a = Date.now();
+        logWithMs(`[PLAY] Player ${id}: Requesting immediate status check (offset: ${t2a-t0}ms)`);
+
+        try {
+          const statusResult = await client.getPlayerStatus();
+          const t2b = Date.now();
+          logWithMs(`[PLAY] Player ${id}: Immediate status received (took: ${t2b-t2a}ms)`);
+          logWithMs(`[PLAY] Player ${id}: Immediate Status - HTTP=${statusResult.status}, status=${statusResult.data?.status}, title=${statusResult.data?.Title}, curpos=${statusResult.data?.curpos}`);
+        } catch (err) {
+          logWithMs(`[PLAY] Player ${id}: Immediate status check failed: ${err.message}`);
+        }
+      });
 
       // Также проверяем статус через 1 секунду для сравнения
       setTimeout(async () => {
@@ -537,10 +574,6 @@ app.post('/api/players/:id/play', async (req, res) => {
           logWithMs(`[PLAY] Player ${id}: Delayed status check error: ${err.message}`);
         }
       }, 1000);
-
-      const t3 = Date.now();
-      logWithMs(`[PLAY] Player ${id}: Sending response to client (total: ${t3-t0}ms)`);
-      res.json({ ...result, _debug: { command, fileUrl, playerId: id, timing: { total: t3-t0, apiCall: t2-t1 } } });
     } else {
       logWithMs(`[PLAY] Player ${id}: resume playback`);
       const result = await client.play();

@@ -1,8 +1,4 @@
 import https from 'https';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
 
 class NetworkScanner {
   constructor(subnet = '192.168.1') {

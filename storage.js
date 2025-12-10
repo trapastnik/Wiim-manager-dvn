@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, renameSync, readdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,6 +10,38 @@ class Storage {
     this.dataDir = join(__dirname, 'data');
     this.playersFile = join(this.dataDir, 'players.json');
     this.mediaFile = join(this.dataDir, 'media.json');
+
+    // Очистка старых временных файлов при инициализации
+    this.cleanupTempFiles();
+  }
+
+  // Очистка временных файлов (.tmp) из директории data
+  cleanupTempFiles() {
+    try {
+      if (!existsSync(this.dataDir)) return;
+
+      const files = readdirSync(this.dataDir);
+      let cleaned = 0;
+
+      files.forEach(file => {
+        if (file.endsWith('.tmp')) {
+          const filePath = join(this.dataDir, file);
+          try {
+            unlinkSync(filePath);
+            cleaned++;
+            console.log(`[STORAGE] Удален временный файл: ${file}`);
+          } catch (err) {
+            console.error(`[STORAGE] Ошибка удаления ${file}:`, err.message);
+          }
+        }
+      });
+
+      if (cleaned > 0) {
+        console.log(`[STORAGE] Очищено временных файлов: ${cleaned}`);
+      }
+    } catch (error) {
+      console.error('[STORAGE] Ошибка при очистке временных файлов:', error.message);
+    }
   }
 
   // Чтение данных плееров
@@ -26,10 +58,15 @@ class Storage {
     }
   }
 
-  // Сохранение плееров
+  // Атомарное сохранение плееров (защита от корруптирования файла)
   savePlayers(playersData) {
     try {
-      writeFileSync(this.playersFile, JSON.stringify(playersData, null, 2));
+      // Записываем во временный файл
+      const tempFile = this.playersFile + '.tmp';
+      writeFileSync(tempFile, JSON.stringify(playersData, null, 2));
+
+      // Атомарная замена (если запись прервется, старый файл останется целым)
+      renameSync(tempFile, this.playersFile);
       return true;
     } catch (error) {
       console.error('Error saving players:', error);
@@ -112,12 +149,18 @@ class Storage {
     }
   }
 
-  // Сохранение медиа
+  // Атомарное сохранение медиа (защита от корруптирования файла)
   saveMedia(mediaData) {
     try {
       console.log(`[STORAGE] Saving media to: ${this.mediaFile}`);
       console.log(`[STORAGE] Files count: ${mediaData.files.length}`);
-      writeFileSync(this.mediaFile, JSON.stringify(mediaData, null, 2));
+
+      // Записываем во временный файл
+      const tempFile = this.mediaFile + '.tmp';
+      writeFileSync(tempFile, JSON.stringify(mediaData, null, 2));
+
+      // Атомарная замена
+      renameSync(tempFile, this.mediaFile);
       console.log(`[STORAGE] Media saved successfully`);
       return true;
     } catch (error) {

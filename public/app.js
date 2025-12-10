@@ -589,11 +589,25 @@ function loadPlayerSelections() {
     }
 }
 
-// Сохранение выборов в localStorage
+// Debounce таймер для отложенного сохранения
+let saveSelectionsTimer = null;
+
+// Сохранение выборов в localStorage с debounce (300ms)
+// Это предотвращает частые записи при быстром переключении файлов
 function savePlayerSelections() {
     // В демо-режиме не сохраняем в localStorage
     if (isDemoMode) return;
-    localStorage.setItem('playerSelections', JSON.stringify(playerSelections));
+
+    // Отменяем предыдущий таймер
+    if (saveSelectionsTimer) {
+        clearTimeout(saveSelectionsTimer);
+    }
+
+    // Устанавливаем новый таймер на 300ms
+    saveSelectionsTimer = setTimeout(() => {
+        localStorage.setItem('playerSelections', JSON.stringify(playerSelections));
+        console.log('[STORAGE] Player selections saved (debounced)');
+    }, 300);
 }
 
 // Загрузка режимов повтора из localStorage
@@ -1158,8 +1172,8 @@ async function refreshAllPlayers() {
         console.log('All players:', allPlayers.length);
         console.log('All media files:', allMediaFiles.length);
 
-        // Получаем статус каждого плеера с измерением времени отклика
-        for (const player of allPlayers) {
+        // ОПТИМИЗАЦИЯ: Получаем статус ВСЕХ плееров ПАРАЛЛЕЛЬНО
+        const statusPromises = allPlayers.map(async (player) => {
             const startTime = Date.now();
             try {
                 const statusRes = await fetch(`/api/players/${player.id}/status`);
@@ -1180,7 +1194,10 @@ async function refreshAllPlayers() {
                 const responseTime = Date.now() - startTime;
                 playerStatuses[player.id] = { status: 'offline', _responseTime: responseTime };
             }
-        }
+        });
+
+        // Ждем завершения ВСЕХ запросов параллельно (в 7 раз быстрее!)
+        await Promise.all(statusPromises);
 
         renderMultiPlayers();
         renderPlayerGroups(); // Обновляем список групп

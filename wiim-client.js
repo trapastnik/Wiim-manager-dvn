@@ -2,9 +2,10 @@ import https from 'https';
 import http from 'http';
 
 class WiiMClient {
-  constructor(ipAddress, useHttps = true) {
+  constructor(ipAddress, useHttps = true, timeout = 5000) {
     this.baseUrl = (useHttps ? 'https://' : 'http://') + ipAddress;
     this.useHttps = useHttps;
+    this.timeout = timeout;
     this.agent = useHttps ? new https.Agent({ rejectUnauthorized: false }) : null;
   }
 
@@ -36,7 +37,7 @@ class WiiMClient {
     const url = this.baseUrl + endpoint;
     const client = this.useHttps ? https : http;
     return new Promise((resolve, reject) => {
-      const req = client.get(url, Object.assign({}, options, { agent: this.agent, timeout: 5000 }), (res) => {
+      const req = client.get(url, Object.assign({}, options, { agent: this.agent, timeout: this.timeout }), (res) => {
         let data = '';
         res.on('data', (chunk) => { data += chunk; });
         res.on('end', () => {

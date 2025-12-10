@@ -1,47 +1,19 @@
 {
   "players": [
     {
-      "id": "1765110234099_gbngjjbq6",
-      "ip": "192.168.0.2",
-      "name": "Naff-Naff",
+      "id": "1765384234590_ft2i90z8j",
+      "ip": "192.168.0.28",
+      "name": "naf naf",
       "useHttps": true,
-      "addedAt": "2025-12-07T12:23:54.099Z"
+      "addedAt": "2025-12-10T16:30:34.590Z"
     },
     {
-      "id": "1765110234100_0ica103ra",
-      "ip": "192.168.0.7",
-      "name": "Nuff-Nuff",
-      "useHttps": true,
-      "addedAt": "2025-12-07T12:23:54.100Z"
-    },
-    {
-      "id": "1765110234101_1cqs5d2m5",
-      "ip": "192.168.0.15",
-      "name": "Niff-niff",
-      "useHttps": true,
-      "addedAt": "2025-12-07T12:23:54.101Z"
-    },
-    {
-      "id": "1765110234101_1cj0xs3sc",
+      "id": "1765385808008_oymswvptt",
       "ip": "192.168.0.37",
-      "name": "McGonagall",
+      "name": "WiiM Mini-D566",
       "useHttps": true,
-      "addedAt": "2025-12-07T12:23:54.101Z"
-    },
-    {
-      "id": "1765110274113_e42dqe7g1",
-      "ip": "192.168.0.3",
-      "name": "Moony",
-      "useHttps": true,
-      "addedAt": "2025-12-07T12:24:34.113Z"
-    },
-    {
-      "id": "1765110274114_uouabkszd",
-      "ip": "192.168.0.20",
-      "name": "Snape",
-      "useHttps": true,
-      "addedAt": "2025-12-07T12:24:34.114Z"
+      "addedAt": "2025-12-10T16:56:48.008Z"
     }
   ],
-  "activePlayer": "1765110234099_gbngjjbq6"
+  "activePlayer": "1765384234590_ft2i90z8j"
 }
