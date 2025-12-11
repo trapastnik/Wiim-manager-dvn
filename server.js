@@ -129,6 +129,231 @@ const initializePlayers = () => {
 
 initializePlayers();
 
+// ================================================
+// СИСТЕМА АВТОПОВТОРА ТРЕКОВ
+// ================================================
+
+// Хранилище состояния плееров для автоповтора
+const autoRepeatState = new Map(); // playerId -> { lastUrl, monitoring: true/false, groupId: string|null }
+
+// Мониторинг плеера для автоповтора
+async function monitorPlayerForRepeat(playerId) {
+  const state = autoRepeatState.get(playerId);
+  if (!state || !state.monitoring) return;
+
+  const client = playerClients.get(playerId);
+  if (!client) {
+    logWithMs(`[AUTO-REPEAT] Player ${playerId} client not found, stopping monitor`);
+    stopMonitoring(playerId);
+    return;
+  }
+
+  try {
+    const status = await client.getPlayerStatus();
+    const playerStatus = status.data?.status;
+    const curpos = parseInt(status.data?.curpos) || 0;
+    const totlen = parseInt(status.data?.totlen) || 0;
+
+    // Если плеер остановлен и трек закончился - перезапускаем
+    if (playerStatus === 'stop' && curpos >= totlen && totlen > 0) {
+      logWithMs(`[AUTO-REPEAT] Player ${playerId}: Track ended (${curpos}ms >= ${totlen}ms), restarting...`);
+
+      // Перезапускаем тот же файл
+      if (state.lastUrl) {
+        const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(state.lastUrl);
+        await client.request(playCommand);
+        logWithMs(`[AUTO-REPEAT] Player ${playerId}: Restarted successfully`);
+
+        // Продолжаем мониторинг через 1 секунду
+        setTimeout(() => monitorPlayerForRepeat(playerId), 1000);
+      } else {
+        logWithMs(`[AUTO-REPEAT] Player ${playerId}: No URL to restart`);
+        stopMonitoring(playerId);
+      }
+    } else if (playerStatus === 'play' || playerStatus === 'load' || playerStatus === 'stop') {
+      // Плеер играет, загружается, или остановлен (но трек ещё не закончился)
+      // Продолжаем мониторинг
+      setTimeout(() => monitorPlayerForRepeat(playerId), 500);
+    } else {
+      // Неизвестный статус - продолжаем мониторинг на всякий случай
+      logWithMs(`[AUTO-REPEAT] Player ${playerId}: Unknown status '${playerStatus}', continuing monitor`);
+      setTimeout(() => monitorPlayerForRepeat(playerId), 1000);
+    }
+  } catch (error) {
+    logWithMs(`[AUTO-REPEAT] Player ${playerId}: Monitor error: ${error.message}`);
+    // При ошибке пробуем ещё раз через 2 секунды
+    setTimeout(() => monitorPlayerForRepeat(playerId), 2000);
+  }
+}
+
+// Запуск мониторинга для плеера
+function startMonitoring(playerId, fileUrl, groupId = null) {
+  logWithMs(`[AUTO-REPEAT] Starting monitor for player ${playerId}${groupId ? ` (group: ${groupId})` : ''}`);
+  autoRepeatState.set(playerId, {
+    lastUrl: fileUrl,
+    monitoring: true,
+    groupId: groupId
+  });
+
+  // Начинаем мониторинг через 1 секунду после запуска
+  setTimeout(() => monitorPlayerForRepeat(playerId), 1000);
+}
+
+// Остановка мониторинга для плеера
+function stopMonitoring(playerId) {
+  const state = autoRepeatState.get(playerId);
+  if (state) {
+    state.monitoring = false;
+    logWithMs(`[AUTO-REPEAT] Stopped monitor for player ${playerId}`);
+  }
+}
+
+// ================================================
+// ГЛОБАЛЬНЫЙ КОНТРОЛЛЕР АВТОПОВТОРА
+// Проверяет каждые 15 секунд все плееры и перезапускает застрявшие
+// ================================================
+
+// Хранилище для отслеживания ручных остановок
+const manualStops = new Set(); // playerId -> была ли ручная команда стоп
+
+// Глобальный контроллер - проверяет все плееры каждые 15 секунд
+async function globalRepeatController() {
+  const activeCount = autoRepeatState.size;
+  logWithMs(`[GLOBAL-CTRL] Check cycle - tracking ${activeCount} players`);
+
+  // Группируем плееры по groupId
+  const groupedPlayers = new Map(); // groupId -> [playerIds]
+  const soloPlayers = []; // плееры без группы
+
+  for (const [playerId, state] of autoRepeatState.entries()) {
+    if (!state.monitoring || manualStops.has(playerId)) continue;
+
+    if (state.groupId) {
+      if (!groupedPlayers.has(state.groupId)) {
+        groupedPlayers.set(state.groupId, []);
+      }
+      groupedPlayers.get(state.groupId).push(playerId);
+    } else {
+      soloPlayers.push(playerId);
+    }
+  }
+
+  // Проверяем соло-плееры
+  for (const playerId of soloPlayers) {
+    await checkAndRestartPlayer(playerId, null);
+  }
+
+  // Проверяем группы
+  for (const [groupId, playerIds] of groupedPlayers.entries()) {
+    logWithMs(`[GLOBAL-CTRL] Checking group ${groupId} with ${playerIds.length} players`);
+
+    // Проверяем статусы всех плееров в группе
+    const groupStatuses = [];
+    for (const playerId of playerIds) {
+      const status = await checkPlayerStatus(playerId);
+      groupStatuses.push({ playerId, status });
+    }
+
+    // Если хотя бы ОДИН плеер застрял или закончился - перезапускаем ВСЮ группу
+    const needsRestart = groupStatuses.some(({ status }) => status && status.needsRestart);
+
+    if (needsRestart) {
+      logWithMs(`[GLOBAL-CTRL] Group ${groupId}: At least one player needs restart, restarting ALL ${playerIds.length} players`);
+
+      // Перезапускаем всю группу с задержкой 100ms между плеерами
+      for (let i = 0; i < playerIds.length; i++) {
+        const playerId = playerIds[i];
+        const state = autoRepeatState.get(playerId);
+        if (!state || !state.lastUrl) continue;
+
+        try {
+          const client = playerClients.get(playerId);
+          if (client) {
+            const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(state.lastUrl);
+            await client.request(playCommand);
+            logWithMs(`[GLOBAL-CTRL] Group ${groupId}: Restarted player ${i+1}/${playerIds.length}`);
+
+            // Задержка между плеерами (кроме последнего)
+            if (i < playerIds.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+        } catch (error) {
+          logWithMs(`[GLOBAL-CTRL] Group ${groupId}: Error restarting player ${playerId}: ${error.message}`);
+        }
+      }
+    }
+  }
+
+  // Следующая проверка через 15 секунд
+  setTimeout(globalRepeatController, 15000);
+}
+
+// Проверка статуса одного плеера
+async function checkPlayerStatus(playerId) {
+  const state = autoRepeatState.get(playerId);
+  if (!state || !state.monitoring || manualStops.has(playerId)) return null;
+
+  const client = playerClients.get(playerId);
+  if (!client) return null;
+
+  try {
+    const status = await client.getPlayerStatus();
+    const playerStatus = status.data?.status;
+    const curpos = parseInt(status.data?.curpos) || 0;
+    const totlen = parseInt(status.data?.totlen) || 0;
+
+    // Проверяем: застрял или закончился
+    const needsRestart = (playerStatus === 'stop' && totlen > 0) &&
+                         (curpos < totlen || curpos >= totlen);
+
+    return { playerStatus, curpos, totlen, needsRestart };
+  } catch (error) {
+    logWithMs(`[GLOBAL-CTRL] Player ${playerId}: Status check error: ${error.message}`);
+    return null;
+  }
+}
+
+// Проверка и перезапуск одного плеера (для соло-плееров)
+async function checkAndRestartPlayer(playerId, groupId) {
+  const state = autoRepeatState.get(playerId);
+  if (!state || !state.monitoring || manualStops.has(playerId)) return;
+
+  const client = playerClients.get(playerId);
+  if (!client || !state.lastUrl) return;
+
+  try {
+    const status = await client.getPlayerStatus();
+    const playerStatus = status.data?.status;
+    const curpos = parseInt(status.data?.curpos) || 0;
+    const totlen = parseInt(status.data?.totlen) || 0;
+
+    // КРИТИЧНО: Если плеер в stop и трек НЕ закончился (застрял) - перезапускаем
+    if (playerStatus === 'stop' && curpos < totlen && totlen > 0) {
+      logWithMs(`[GLOBAL-CTRL] Player ${playerId}: STUCK in stop (${curpos}ms < ${totlen}ms), force restarting...`);
+      const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(state.lastUrl);
+      await client.request(playCommand);
+      logWithMs(`[GLOBAL-CTRL] Player ${playerId}: Force restarted successfully`);
+    }
+    // Также перезапускаем если трек закончился
+    else if (playerStatus === 'stop' && curpos >= totlen && totlen > 0) {
+      logWithMs(`[GLOBAL-CTRL] Player ${playerId}: Track ended (${curpos}ms >= ${totlen}ms), restarting...`);
+      const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(state.lastUrl);
+      await client.request(playCommand);
+      logWithMs(`[GLOBAL-CTRL] Player ${playerId}: Restarted successfully`);
+    }
+  } catch (error) {
+    // Игнорируем ошибки в глобальном контроллере - не критично
+    logWithMs(`[GLOBAL-CTRL] Player ${playerId}: Check error: ${error.message}`);
+  }
+}
+
+// Запускаем глобальный контроллер через 20 секунд после старта сервера
+setTimeout(() => {
+  logWithMs('[GLOBAL-CTRL] Starting global repeat controller (check interval: 15s)');
+  globalRepeatController();
+}, 20000);
+
 // Функция получения активного клиента
 const getActiveClient = () => {
   const activePlayer = storage.getActivePlayer();
@@ -474,25 +699,14 @@ app.get('/api/players/:id/status', async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    // Получаем данные о воспроизведении (status, title, artist, curpos, totlen)
-    const playerStatus = await client.getPlayerStatus();
-
-    // Получаем расширенную информацию (WiFi: essid, RSSI, BSSID)
+    // ОПТИМИЗАЦИЯ: используем только getStatusEx (getStatusInfo)
+    // Он возвращает ВСЁ: status, title, artist, curpos, totlen, WiFi info
+    // Это в 2 раза быстрее чем 2 отдельных запроса!
     const statusEx = await client.getStatusInfo();
 
-    // Объединяем данные: основа - статус воспроизведения, дополнение - WiFi информация
-    const combinedData = {
-      ...playerStatus.data,
-      essid: statusEx.data?.essid,
-      RSSI: statusEx.data?.RSSI,
-      BSSID: statusEx.data?.BSSID,
-      wlanSnr: statusEx.data?.wlanSnr,
-      DeviceName: statusEx.data?.DeviceName
-    };
-
     const info = {
-      status: playerStatus.status,
-      data: combinedData
+      status: statusEx.status,
+      data: statusEx.data
     };
 
     console.log(`[STATUS] Player ${id}: status=${info.data?.status}, RSSI=${info.data?.RSSI}, SSID=${info.data?.essid}`);
@@ -517,7 +731,7 @@ app.post('/api/players/:id/play', async (req, res) => {
   logWithMs(`[PLAY] Request received for player ID=${id}, Name=${playerName}, IP=${playerIp}`);
 
   try {
-    const { fileUrl } = req.body;
+    const { fileUrl, loopMode, groupId } = req.body;
     const client = playerClients.get(id);
 
     if (!client) {
@@ -549,6 +763,16 @@ app.post('/api/players/:id/play', async (req, res) => {
       const t3 = Date.now();
       logWithMs(`[PLAY] Player ${id}: Sending response to client (total: ${t3-t0}ms)`);
       res.json({ ...result, _debug: { command, fileUrl, playerId: id, timing: { total: t3-t0, apiCall: t2-t1 } } });
+
+      // Запускаем систему автоповтора для этого плеера
+      // Серверный автоповтор работает ВМЕСТО loopMode (который не работает с play:URL)
+      startMonitoring(id, fileUrl, groupId);
+
+      // Снимаем флаг ручной остановки - плеер снова запущен
+      if (manualStops.has(id)) {
+        manualStops.delete(id);
+        logWithMs(`[PLAY] Player ${id}: Removed manual stop flag`);
+      }
 
       // Проверяем статус АСИНХРОННО (не блокируя ответ клиенту)
       // Fire-and-forget - для диагностики
@@ -638,6 +862,14 @@ app.post('/api/players/:id/stop', async (req, res) => {
 
     const result = await client.stop();
     logWithMs(`[STOP] Player ${playerName} (${playerIp}) stopped successfully`);
+
+    // Останавливаем мониторинг автоповтора
+    stopMonitoring(id);
+
+    // Помечаем как ручную остановку для глобального контроллера
+    manualStops.add(id);
+    logWithMs(`[STOP] Player ${id} marked as manually stopped`);
+
     res.json(result);
   } catch (error) {
     logWithMs(`[STOP ERROR] Player ${id}: ${error.message}`);
@@ -648,6 +880,7 @@ app.post('/api/players/:id/stop', async (req, res) => {
 // Воспроизведение звукового сигнала на конкретном плеере
 app.post('/api/players/:id/beep', async (req, res) => {
   const { id } = req.params;
+  const { beepUrl } = req.body; // Получаем URL кастомного файла из тела запроса
 
   try {
     const client = playerClients.get(id);
@@ -656,15 +889,21 @@ app.post('/api/players/:id/beep', async (req, res) => {
       return res.status(404).json({ error: 'Player not found' });
     }
 
-    // Используем Text-to-Speech API для генерации короткого звукового сигнала
-    // Альтернативно можно использовать готовый beep файл
-    const beepText = "Бип";
-    const ttsUrl = `http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ru&q=${encodeURIComponent(beepText)}`;
+    let soundUrl;
 
-    console.log(`[BEEP] Playing beep sound on player ${id}: ${ttsUrl}`);
+    // Если передан кастомный URL, используем его
+    if (beepUrl && beepUrl !== 'default') {
+      soundUrl = beepUrl;
+      console.log(`[BEEP] Playing custom beep sound on player ${id}: ${soundUrl}`);
+    } else {
+      // Используем Text-to-Speech API для генерации короткого звукового сигнала по умолчанию
+      const beepText = "Бип";
+      soundUrl = `http://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=ru&q=${encodeURIComponent(beepText)}`;
+      console.log(`[BEEP] Playing default TTS beep on player ${id}: ${soundUrl}`);
+    }
 
-    // Воспроизводим TTS
-    const result = await client.playUrl(ttsUrl);
+    // Воспроизводим звук
+    const result = await client.playUrl(soundUrl);
 
     res.json({
       status: 'success',
@@ -816,6 +1055,26 @@ app.get('/api/stats', (req, res) => {
     memory: process.memoryUsage(),
     cpu: process.cpuUsage()
   });
+});
+
+// ================================================
+// DYNAMIC M3U PLAYLIST GENERATION
+// ================================================
+
+// Генерация m3u плейлиста из одного файла (для loopmode)
+app.get('/api/playlist/:filename', (req, res) => {
+  const { filename } = req.params;
+  const serverUrl = `http://${req.headers.host}`;
+  const fileUrl = `${serverUrl}/media/${filename}`;
+
+  // M3U формат
+  const m3uContent = `#EXTM3U\n#EXTINF:-1,${filename}\n${fileUrl}\n`;
+
+  res.setHeader('Content-Type', 'audio/x-mpegurl');
+  res.setHeader('Content-Disposition', `inline; filename="${filename}.m3u"`);
+  res.send(m3uContent);
+
+  console.log(`[M3U] Generated playlist for ${filename}: ${fileUrl}`);
 });
 
 // Запуск сервера

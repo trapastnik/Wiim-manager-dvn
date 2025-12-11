@@ -1504,6 +1504,30 @@ h1 {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
+.settings-control select.beep-sound-select {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1f2937;
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-control select.beep-sound-select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.settings-control select.beep-sound-select:hover {
+    border-color: #9ca3af;
+}
+
 .settings-value {
     font-size: 14px;
     color: #667eea;

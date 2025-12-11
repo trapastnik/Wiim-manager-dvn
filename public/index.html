@@ -33,7 +33,7 @@
             <div class="global-controls">
                 <button class="btn btn-success" onclick="playAll()">▶ Запустить все</button>
                 <button class="btn btn-danger" onclick="stopAll()">⏹ Остановить все</button>
-                <button class="btn btn-secondary" onclick="toggleLoopModeAll()" id="loop-all-btn">🔁 Режим повтора (все)</button>
+                <!-- Режим повтора ВСЕГДА включён автоматически, кнопка не нужна -->
                 <button class="btn btn-primary" onclick="refreshAllPlayers()">🔄 Обновить статусы</button>
             </div>
 
@@ -112,47 +112,29 @@
                 <h2>⚙️ Настройки системы</h2>
             </div>
 
-            <!-- Секция: Режим повтора -->
+            <!-- Секция: Пищалка -->
             <div class="settings-section">
-                <h3>🔁 Настройки режима повтора</h3>
+                <h3>🔔 Настройки пищалки</h3>
                 <p class="settings-description">
-                    Предиктивный перезапуск позволяет плавно повторять треки без пауз.
-                    Команда воспроизведения отправляется ДО окончания трека.
+                    Выберите звуковой файл из медиа библиотеки для кнопки "Пищалка" на плеерах.
+                    Это поможет идентифицировать плееры по звуку.
                 </p>
 
                 <div class="settings-row">
                     <div class="settings-item">
-                        <label for="loop-threshold">
-                            <strong>Порог перезапуска (мс)</strong>
-                            <span class="settings-help">За сколько миллисекунд до конца трека отправлять команду play</span>
+                        <label for="beep-sound-select">
+                            <strong>Звук пищалки</strong>
+                            <span class="settings-help">Выберите аудио файл для воспроизведения</span>
                         </label>
                         <div class="settings-control">
-                            <input type="number" id="loop-threshold" min="500" max="10000" step="100" value="2000">
-                            <span class="settings-value"><span id="loop-threshold-display">2000</span> мс (<span id="loop-threshold-seconds">2.0</span> сек)</span>
+                            <select id="beep-sound-select" class="beep-sound-select" onchange="saveSettings()">
+                                <option value="default">По умолчанию (Google TTS "Бип")</option>
+                            </select>
                         </div>
                         <div class="settings-hint">
-                            Рекомендуется: 2000-3000 мс. Меньше = короче, но рискованнее. Больше = безопаснее, но может обрывать трек.
+                            Выбранный файл будет воспроизводиться при нажатии на кнопку "🔔 Пищалка" у любого плеера.
                         </div>
                     </div>
-
-                    <div class="settings-item">
-                        <label for="loop-reset-threshold">
-                            <strong>Порог обнаружения старта (мс)</strong>
-                            <span class="settings-help">Когда считать, что трек начался заново (для сброса флага перезапуска)</span>
-                        </label>
-                        <div class="settings-control">
-                            <input type="number" id="loop-reset-threshold" min="1000" max="15000" step="1000" value="5000">
-                            <span class="settings-value"><span id="loop-reset-display">5000</span> мс (<span id="loop-reset-seconds">5.0</span> сек)</span>
-                        </div>
-                        <div class="settings-hint">
-                            Рекомендуется: 5000 мс (первые 5 секунд трека). Если флаг не сбрасывается, увеличьте значение.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="settings-actions">
-                    <button class="btn btn-primary" onclick="saveSettings()">💾 Сохранить настройки</button>
-                    <button class="btn btn-secondary" onclick="resetSettings()">🔄 Сбросить к значениям по умолчанию</button>
                 </div>
             </div>
 

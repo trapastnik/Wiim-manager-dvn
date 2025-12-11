@@ -12,7 +12,11 @@
       "Bash(pkill:*)",
       "Bash(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport:*)",
       "Bash(networksetup -getairportnetwork:*)",
-      "Bash(system_profiler:*)"
+      "Bash(system_profiler:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)",
+      "Bash(ffprobe:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

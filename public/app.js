@@ -11,7 +11,7 @@ let allMediaFiles = [];
 let playerSelections = {}; // Сохраняем выбор файла для каждого плеера
 let playerStatuses = {}; // Статусы всех плееров
 let playerDiagnostics = {}; // Диагностическая информация для каждого плеера
-let playerLoopModes = {}; // Режимы повтора для каждого плеера (0=single, 2=loop)
+let playerLoopModes = {}; // Режимы повтора для каждого плеера (0=no loop, 1=single loop)
 let serverInfo = null; // Информация о сервере (IP адреса)
 let lastPlayerPositions = {}; // Последние позиции плееров для отслеживания зависаний
 let playerManualStops = {}; // Отслеживание ручных остановок плееров
@@ -466,9 +466,37 @@ async function loadMedia() {
         console.log('Загружены медиа файлы:', data);
         allMediaFiles = data.files || []; // Обновляем глобальную переменную
         renderMedia(allMediaFiles);
+        updateBeepSoundOptions(); // Обновляем список звуков для пищалки
         updateSystemInfo(); // Обновляем информацию о системе
     } catch (error) {
         addMessage(`Ошибка загрузки медиа: ${error.message}`, 'error');
+    }
+}
+
+// Обновление списка звуков для пищалки в настройках
+function updateBeepSoundOptions() {
+    const beepSelect = document.getElementById('beep-sound-select');
+    if (!beepSelect) return;
+
+    // Сохраняем текущий выбор
+    const currentValue = beepSelect.value;
+
+    // Очищаем и добавляем опцию по умолчанию
+    beepSelect.innerHTML = '<option value="default">По умолчанию (Google TTS "Бип")</option>';
+
+    // Добавляем все медиа файлы
+    allMediaFiles.forEach(file => {
+        const option = document.createElement('option');
+        option.value = file.url; // Используем URL файла
+        option.textContent = file.name;
+        beepSelect.appendChild(option);
+    });
+
+    // Восстанавливаем предыдущий выбор, если он существует
+    if (currentValue && Array.from(beepSelect.options).some(opt => opt.value === currentValue)) {
+        beepSelect.value = currentValue;
+    } else if (appSettings.beepSoundUrl) {
+        beepSelect.value = appSettings.beepSoundUrl;
     }
 }
 
@@ -787,7 +815,7 @@ async function playGroup(groupId) {
         await Promise.all(promises);
         const elapsed = Date.now() - startTime;
         addMessage(`✓ Группа "${group.name}" запущена за ${elapsed}ms`, 'success');
-        startTemporaryAutoRefresh(5, 2000);
+        startTemporaryAutoRefresh(2, 3000); // Было 5×2с, теперь 2×3с
     } catch (error) {
         addMessage(`Ошибка запуска группы: ${error.message}`, 'error');
     }
@@ -1016,61 +1044,8 @@ async function checkAndRestartIfNeeded(playerId, statusData) {
         alreadyRestarted: lastPos?.alreadyRestarted || false
     };
 
-    // НОВОЕ: Предиктивный перезапуск - начинаем новое воспроизведение ДО окончания трека
-    // Если до конца осталось меньше заданного порога (по умолчанию 2000ms) и плеер играет
-    const timeLeft = totlen - curpos;
-    if (playerStatus === 'play' && totlen > 0 && timeLeft > 0 && timeLeft <= appSettings.loopThreshold) {
-        // Проверяем, не перезапускали ли мы уже этот трек
-        if (!lastPos?.alreadyRestarted) {
-            console.log(`[LOOP] ${getPlayerName(playerId)}: осталось ${timeLeft}ms, предиктивный перезапуск`);
-
-            lastPlayerPositions[playerId].alreadyRestarted = true;
-
-            try {
-                await playPlayer(playerId, true); // skipRefresh = true
-                console.log(`[LOOP] ${getPlayerName(playerId)}: предиктивный перезапуск отправлен`);
-            } catch (error) {
-                console.error(`[LOOP] Ошибка предиктивного перезапуска ${playerId}:`, error);
-                lastPlayerPositions[playerId].alreadyRestarted = false;
-            }
-            return;
-        }
-    }
-
-    // Сбрасываем флаг перезапуска, когда трек начался заново (позиция вернулась к началу)
-    if (curpos < appSettings.loopResetThreshold && lastPos?.curpos > appSettings.loopResetThreshold) {
-        lastPlayerPositions[playerId].alreadyRestarted = false;
-    }
-
-    // Условие 1: Плеер остановлен и трек закончился (позиция >= длины)
-    // Это резервный механизм на случай, если предиктивный не сработал
-    if (playerStatus === 'stop' && totlen > 0 && curpos >= totlen) {
-        console.log(`[LOOP] ${getPlayerName(playerId)}: трек закончился (${curpos}/${totlen}ms), перезапускаем`);
-
-        try {
-            await playPlayer(playerId, true); // skipRefresh = true чтобы не спамить сообщениями
-            addMessage(`🔁 ${getPlayerName(playerId)}: перезапуск трека`, 'info');
-        } catch (error) {
-            console.error(`[LOOP] Ошибка перезапуска плеера ${playerId}:`, error);
-        }
-        return;
-    }
-
-    // Условие 2: Плеер остановлен, но трек еще не должен был закончиться
-    // Это может означать ошибку воспроизведения
-    if (playerStatus === 'stop' && totlen > 0 && curpos < totlen - 1000) {
-        // Проверяем, был ли он в состоянии play недавно
-        if (lastPos && lastPos.status === 'play') {
-            console.log(`[LOOP] ${getPlayerName(playerId)}: неожиданная остановка (${curpos}/${totlen}ms), перезапускаем`);
-
-            try {
-                await playPlayer(playerId, true);
-                addMessage(`🔁 ${getPlayerName(playerId)}: перезапуск после сбоя`, 'warning');
-            } catch (error) {
-                console.error(`[LOOP] Ошибка перезапуска после сбоя ${playerId}:`, error);
-            }
-        }
-    }
+    // Предиктивный перезапуск УДАЛЁН - теперь используется встроенный режим повтора WiiM (loopmode:1)
+    // WiiM сам бесконечно повторяет трек без дополнительных команд от сервера!
 }
 
 // Проверка и управление адаптивным автообновлением
@@ -1104,7 +1079,7 @@ function startAdaptiveRefresh() {
             console.log('[ADAPTIVE] Обновление статусов играющих плееров');
             refreshAllPlayers();
         }
-    }, 3000); // Каждые 3 секунды
+    }, 5000); // Каждые 5 секунд (было 3 секунды)
 }
 
 // Остановка адаптивного автообновления
@@ -1172,32 +1147,38 @@ async function refreshAllPlayers() {
         console.log('All players:', allPlayers.length);
         console.log('All media files:', allMediaFiles.length);
 
-        // ОПТИМИЗАЦИЯ: Получаем статус ВСЕХ плееров ПАРАЛЛЕЛЬНО
-        const statusPromises = allPlayers.map(async (player) => {
-            const startTime = Date.now();
-            try {
-                const statusRes = await fetch(`/api/players/${player.id}/status`);
-                const responseTime = Date.now() - startTime;
-                if (statusRes.ok) {
-                    const status = await statusRes.json();
-                    playerStatuses[player.id] = {
-                        ...(status.data || {}),
-                        _responseTime: responseTime
-                    };
+        // ОПТИМИЗАЦИЯ: Батчинг запросов по 3 плеера одновременно для снижения нагрузки на WiFi
+        const BATCH_SIZE = 3; // Максимум 3 параллельных запроса
 
-                    // Проверка на автоматический перезапуск при включенном режиме повтора
-                    await checkAndRestartIfNeeded(player.id, status.data);
-                } else {
+        for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
+            const batch = allPlayers.slice(i, i + BATCH_SIZE);
+
+            const batchPromises = batch.map(async (player) => {
+                const startTime = Date.now();
+                try {
+                    const statusRes = await fetch(`/api/players/${player.id}/status`);
+                    const responseTime = Date.now() - startTime;
+                    if (statusRes.ok) {
+                        const status = await statusRes.json();
+                        playerStatuses[player.id] = {
+                            ...(status.data || {}),
+                            _responseTime: responseTime
+                        };
+
+                        // Проверка на автоматический перезапуск при включенном режиме повтора
+                        await checkAndRestartIfNeeded(player.id, status.data);
+                    } else {
+                        playerStatuses[player.id] = { status: 'offline', _responseTime: responseTime };
+                    }
+                } catch (e) {
+                    const responseTime = Date.now() - startTime;
                     playerStatuses[player.id] = { status: 'offline', _responseTime: responseTime };
                 }
-            } catch (e) {
-                const responseTime = Date.now() - startTime;
-                playerStatuses[player.id] = { status: 'offline', _responseTime: responseTime };
-            }
-        });
+            });
 
-        // Ждем завершения ВСЕХ запросов параллельно (в 7 раз быстрее!)
-        await Promise.all(statusPromises);
+            // Ждем завершения текущего батча перед следующим
+            await Promise.all(batchPromises);
+        }
 
         renderMultiPlayers();
         renderPlayerGroups(); // Обновляем список групп
@@ -1352,11 +1333,7 @@ function renderMultiPlayers() {
                     </button>
                 </div>
 
-                <div class="player-loop-control">
-                    <button class="btn ${loopMode === 2 ? 'btn-loop-active' : 'btn-secondary'} btn-loop" onclick="toggleLoopMode('${player.id}')" id="loop-btn-${player.id}">
-                        ${loopMode === 2 ? '🔁 Повтор' : '▶️ Один раз'}
-                    </button>
-                </div>
+                <!-- Режим повтора ВСЕГДА включён (loopmode=2), кнопка не нужна -->
 
                 <div class="player-volume-control">
                     <button class="btn btn-small" onclick="adjustVolume('${player.id}', -5)">−</button>
@@ -1416,7 +1393,7 @@ function updatePlayerPlayButton(playerId, filePath) {
 }
 
 // Воспроизведение на одном плеере
-async function playPlayer(playerId, skipRefresh = false, startTime = null) {
+async function playPlayer(playerId, skipRefresh = false, startTime = null, groupId = null) {
     const t0 = startTime || performance.now();
     const player = allPlayers.find(p => p.id === playerId);
     const playerName = player ? player.name : playerId;
@@ -1459,10 +1436,14 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null) {
         const t1 = performance.now();
         console.log(`[PLAY ${t1.toFixed(3)}ms] ${playerName} [${playerId}]: Sending fetch request (offset: ${(t1-t0).toFixed(3)}ms)`);
 
+        // ВСЕГДА используем loopMode=2 (repeat all) для бесконечного повтора трека
+        // Это единственный способ заставить WiiM повторять одиночный файл через play:URL
+        const loopMode = 2;
+
         const response = await fetch(`/api/players/${playerId}/play`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileUrl: serverUrl })
+            body: JSON.stringify({ fileUrl: serverUrl, loopMode: loopMode, groupId: groupId })
         });
 
         const t2 = performance.now();
@@ -1496,7 +1477,7 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null) {
 
             // Обновляем статусы только при индивидуальном запуске
             if (!skipRefresh) {
-                startTemporaryAutoRefresh(5, 2000); // 5 обновлений каждые 2 секунды
+                startTemporaryAutoRefresh(2, 3000); // 2 обновления каждые 3 секунды (было 5×2с)
             }
         } else {
             addMessage(`Ошибка: ${result.error}`, 'error');
@@ -1520,7 +1501,7 @@ async function pausePlayer(playerId) {
 
         if (response.ok) {
             addMessage(`⏸ Пауза: ${getPlayerName(playerId)}`, 'success');
-            startTemporaryAutoRefresh(3, 2000); // 3 обновления для паузы
+            startTemporaryAutoRefresh(1, 3000); // 1 обновление через 3 секунды (было 3×2с)
         }
     } catch (error) {
         addMessage(`Ошибка паузы: ${error.message}`, 'error');
@@ -1541,9 +1522,16 @@ async function beepPlayer(playerId) {
 
         addMessage(`🔔 ${getPlayerName(playerId)}: воспроизведение звукового сигнала...`, 'info');
 
+        // Получаем URL звука из настроек
+        const beepUrl = appSettings.beepSoundUrl || 'default';
+
         // Отправляем запрос на воспроизведение beep
         const response = await fetch(`/api/players/${playerId}/beep`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ beepUrl })
         });
 
         if (response.ok) {
@@ -1570,7 +1558,7 @@ async function stopPlayer(playerId) {
 
         if (response.ok) {
             addMessage(`⏹ Остановка: ${getPlayerName(playerId)}`, 'success');
-            startTemporaryAutoRefresh(3, 2000); // 3 обновления для остановки
+            startTemporaryAutoRefresh(1, 3000); // 1 обновление через 3 секунды (было 3×2с)
         }
     } catch (error) {
         addMessage(`Ошибка остановки: ${error.message}`, 'error');
@@ -1603,10 +1591,10 @@ async function adjustVolume(playerId, delta) {
 // Переключение режима повтора
 async function toggleLoopMode(playerId) {
     try {
-        // Получаем текущий режим (по умолчанию 0 = одноразовое)
+        // Получаем текущий режим (по умолчанию 0 = без повтора)
         const currentMode = playerLoopModes[playerId] || 0;
-        // Переключаем: 0 -> 2 -> 0 (single -> loop -> single)
-        const newMode = currentMode === 0 ? 2 : 0;
+        // Переключаем: 0 -> 1 -> 0 (no loop -> single loop -> no loop)
+        const newMode = currentMode === 0 ? 1 : 0;
 
         const response = await fetch(`/api/players/${playerId}/loopmode`, {
             method: 'POST',
@@ -1658,50 +1646,88 @@ async function playAll() {
 
     addMessage('Запуск всех плееров...', 'info');
 
-    // Собираем все плееры, у которых выбран файл
+    // Собираем все плееры, у которых выбран файл И которые НЕ играют
     const playersToStart = allPlayers.filter(player => {
         const hasFile = playerSelections[player.id];
-        console.log(`[PLAY_ALL] Player ${player.name} [${player.id}]: hasFile=${!!hasFile}, file=${playerSelections[player.id]}`);
+        const isPlaying = playerStatuses[player.id]?.status === 'play';
+        console.log(`[PLAY_ALL] Player ${player.name} [${player.id}]: hasFile=${!!hasFile}, isPlaying=${isPlaying}, file=${playerSelections[player.id]}`);
+
+        // Пропускаем уже играющие плееры
+        if (isPlaying) {
+            console.log(`[PLAY_ALL] Player ${player.name} is already playing, skipping`);
+            return false;
+        }
+
         return hasFile;
     });
 
     console.log(`[PLAY_ALL] Players to start: ${playersToStart.length}`);
 
     if (playersToStart.length === 0) {
-        addMessage('Нет плееров с выбранными файлами', 'warning');
+        addMessage('Все плееры уже воспроизводятся или нет выбранных файлов', 'info');
         return;
     }
 
-    // Запускаем все плееры параллельно
+    // Генерируем groupId для синхронного перезапуска всей группы
+    const groupId = `playAll_${Date.now()}`;
+    console.log(`[PLAY_ALL] Generated groupId: ${groupId}`);
+
+    // STAGGERED START: запускаем плееры с небольшой задержкой между ними
+    // Это снижает нагрузку на WiFi сеть и предотвращает таймауты
+    const STAGGER_DELAY = 100; // мс между запусками плееров
     const startTime = Date.now();
     const t1 = performance.now();
-    console.log(`[PLAY_ALL ${t1.toFixed(3)}ms] Creating ${playersToStart.length} promises (offset: ${(t1-t0).toFixed(3)}ms)`);
+    console.log(`[PLAY_ALL ${t1.toFixed(3)}ms] Starting ${playersToStart.length} players with ${STAGGER_DELAY}ms stagger delay`);
 
-    const promises = playersToStart.map((player, index) => {
-        const tMap = performance.now();
-        console.log(`[PLAY_ALL ${tMap.toFixed(3)}ms] Creating promise #${index+1} for player: ${player.name} [${player.id}] (offset: ${(tMap-t0).toFixed(3)}ms)`);
-        return playPlayer(player.id, true, tMap); // skipRefresh = true, передаём время старта
-    });
+    const results = [];
+    let successCount = 0;
+    let errorCount = 0;
 
-    const t2 = performance.now();
-    console.log(`[PLAY_ALL ${t2.toFixed(3)}ms] All promises created. Waiting for completion... (offset: ${(t2-t0).toFixed(3)}ms)`);
+    for (let i = 0; i < playersToStart.length; i++) {
+        const player = playersToStart[i];
+        const tStart = performance.now();
 
-    try {
-        await Promise.all(promises);
-        const elapsed = Date.now() - startTime;
-        const t3 = performance.now();
-        console.log(`[PLAY_ALL ${t3.toFixed(3)}ms] All promises completed in ${elapsed}ms (total offset: ${(t3-t0).toFixed(3)}ms)`);
-        addMessage(`Запущено плееров: ${playersToStart.length} за ${elapsed}ms`, 'success');
+        try {
+            console.log(`[PLAY_ALL ${tStart.toFixed(3)}ms] Starting player #${i+1}/${playersToStart.length}: ${player.name} [${player.id}]`);
 
-        // Запускаем временное автообновление после запуска всех плееров
-        startTemporaryAutoRefresh(5, 2000);
-    } catch (error) {
-        console.error('[PLAY_ALL] Error:', error);
-        addMessage(`Ошибка при запуске: ${error.message}`, 'error');
+            // Показываем прогресс в сообщениях
+            addMessage(`⏳ Запуск ${i+1}/${playersToStart.length}: ${player.name}`, 'info');
 
-        // Обновляем статусы даже при ошибке
-        startTemporaryAutoRefresh(3, 2000);
+            // Запускаем плеер с groupId
+            await playPlayer(player.id, true, tStart, groupId);
+            successCount++;
+
+            // Добавляем задержку перед следующим плеером (кроме последнего)
+            if (i < playersToStart.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, STAGGER_DELAY));
+            }
+        } catch (error) {
+            console.error(`[PLAY_ALL] Error starting player ${player.name}:`, error);
+            errorCount++;
+        }
     }
+
+    const elapsed = Date.now() - startTime;
+    const t3 = performance.now();
+    console.log(`[PLAY_ALL ${t3.toFixed(3)}ms] All players processed in ${elapsed}ms (total offset: ${(t3-t0).toFixed(3)}ms)`);
+
+    // Подсчитываем сколько плееров уже играли
+    const alreadyPlayingCount = allPlayers.filter(p =>
+        playerSelections[p.id] && playerStatuses[p.id]?.status === 'play'
+    ).length - successCount;
+
+    if (errorCount > 0) {
+        addMessage(`Запущено ${successCount}/${playersToStart.length} плееров за ${Math.round(elapsed/1000)}s (${errorCount} ошибок${alreadyPlayingCount > 0 ? `, ${alreadyPlayingCount} уже играли` : ''})`, 'warning');
+    } else {
+        addMessage(`Запущено плееров: ${successCount}/${playersToStart.length} за ${Math.round(elapsed/1000)}s${alreadyPlayingCount > 0 ? ` (${alreadyPlayingCount} уже играли)` : ''}`, 'success');
+    }
+
+    // Ждём 1 секунду чтобы плееры успели начать воспроизведение
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Запускаем временное автообновление после запуска всех плееров
+    // 2 обновления каждые 3 секунды = 6 секунд мониторинга (снижаем нагрузку на WiFi)
+    startTemporaryAutoRefresh(2, 3000);
 }
 
 // Остановить все плееры
@@ -1735,9 +1761,9 @@ async function toggleLoopModeAll() {
 
     // Определяем целевой режим: если хотя бы один плеер не в режиме повтора, включаем всем
     // Если все в режиме повтора, выключаем всем
-    const anyNotInLoopMode = allPlayers.some(player => playerLoopModes[player.id] !== 2);
-    const targetMode = anyNotInLoopMode ? 2 : 0;
-    const modeName = targetMode === 2 ? 'Повтор' : 'Одноразовое';
+    const anyNotInLoopMode = allPlayers.some(player => playerLoopModes[player.id] !== 1);
+    const targetMode = anyNotInLoopMode ? 1 : 0;
+    const modeName = targetMode === 1 ? 'Повтор' : 'Одноразовое';
 
     addMessage(`Установка режима "${modeName}" для всех плееров...`, 'info');
 
@@ -1786,7 +1812,7 @@ function updateLoopAllButton() {
     if (!btn) return;
 
     // Проверяем, все ли плееры в режиме повтора
-    const allInLoopMode = allPlayers.length > 0 && allPlayers.every(player => playerLoopModes[player.id] === 2);
+    const allInLoopMode = allPlayers.length > 0 && allPlayers.every(player => playerLoopModes[player.id] === 1);
 
     if (allInLoopMode) {
         btn.textContent = '🔁 Режим повтора: ВКЛ (все)';
@@ -2271,8 +2297,7 @@ window.addEventListener('load', () => {
 
 // Глобальные переменные настроек с значениями по умолчанию
 let appSettings = {
-    loopThreshold: 2000,        // За сколько мс до конца трека перезапускать
-    loopResetThreshold: 5000    // Порог обнаружения нового старта
+    beepSoundUrl: 'default'     // URL звука для пищалки (default = Google TTS)
 };
 
 // Загрузка настроек из localStorage
@@ -2290,17 +2315,10 @@ function loadSettings() {
 
 // Обновление UI настроек
 function updateSettingsUI() {
-    const loopThreshold = document.getElementById('loop-threshold');
-    const loopResetThreshold = document.getElementById('loop-reset-threshold');
+    const beepSoundSelect = document.getElementById('beep-sound-select');
 
-    if (loopThreshold) {
-        loopThreshold.value = appSettings.loopThreshold;
-        updateSettingDisplay('loop-threshold', appSettings.loopThreshold);
-    }
-
-    if (loopResetThreshold) {
-        loopResetThreshold.value = appSettings.loopResetThreshold;
-        updateSettingDisplay('loop-reset-threshold', appSettings.loopResetThreshold);
+    if (beepSoundSelect) {
+        beepSoundSelect.value = appSettings.beepSoundUrl || 'default';
     }
 
     // Обновляем счетчики в секции информации
@@ -2311,34 +2329,13 @@ function updateSettingsUI() {
     if (mediaCount) mediaCount.textContent = allMediaFiles.length;
 }
 
-// Обновление отображения значения в миллисекундах и секундах
-function updateSettingDisplay(id, value) {
-    const displayElement = document.getElementById(`${id}-display`);
-    const secondsElement = document.getElementById(`${id}-seconds`);
-
-    if (displayElement) displayElement.textContent = value;
-    if (secondsElement) secondsElement.textContent = (value / 1000).toFixed(1);
-}
-
 // Сохранение настроек
 function saveSettings() {
-    const loopThreshold = parseInt(document.getElementById('loop-threshold').value);
-    const loopResetThreshold = parseInt(document.getElementById('loop-reset-threshold').value);
-
-    // Валидация
-    if (isNaN(loopThreshold) || loopThreshold < 500 || loopThreshold > 10000) {
-        addMessage('❌ Порог перезапуска должен быть от 500 до 10000 мс', 'error');
-        return;
-    }
-
-    if (isNaN(loopResetThreshold) || loopResetThreshold < 1000 || loopResetThreshold > 15000) {
-        addMessage('❌ Порог обнаружения должен быть от 1000 до 15000 мс', 'error');
-        return;
-    }
+    const beepSoundSelect = document.getElementById('beep-sound-select');
+    const beepSoundUrl = beepSoundSelect ? beepSoundSelect.value : 'default';
 
     // Сохранение
-    appSettings.loopThreshold = loopThreshold;
-    appSettings.loopResetThreshold = loopResetThreshold;
+    appSettings.beepSoundUrl = beepSoundUrl;
 
     localStorage.setItem('appSettings', JSON.stringify(appSettings));
     updateSettingsUI();
@@ -2354,8 +2351,7 @@ function resetSettings() {
     }
 
     appSettings = {
-        loopThreshold: 2000,
-        loopResetThreshold: 5000
+        beepSoundUrl: 'default'
     };
 
     localStorage.setItem('appSettings', JSON.stringify(appSettings));
