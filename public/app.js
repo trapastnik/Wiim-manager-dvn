@@ -635,7 +635,32 @@ function savePlayerSelections() {
     saveSelectionsTimer = setTimeout(() => {
         localStorage.setItem('playerSelections', JSON.stringify(playerSelections));
         console.log('[STORAGE] Player selections saved (debounced)');
+
+        // Синхронизируем с сервером для автовосстановления
+        syncConfigToServer();
     }, 300);
+}
+
+// Синхронизация конфигурации с сервером
+async function syncConfigToServer() {
+    try {
+        const response = await fetch('/api/config/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                playerSelections: playerSelections,
+                playerGroups: playerGroups
+            })
+        });
+
+        if (response.ok) {
+            console.log('[CONFIG-SYNC] Configuration synced to server successfully');
+        } else {
+            console.error('[CONFIG-SYNC] Failed to sync configuration:', await response.text());
+        }
+    } catch (error) {
+        console.error('[CONFIG-SYNC] Error syncing configuration:', error);
+    }
 }
 
 // Загрузка режимов повтора из localStorage
@@ -672,6 +697,9 @@ function loadPlayerGroups() {
 // Сохранение групп в localStorage
 function savePlayerGroups() {
     localStorage.setItem('playerGroups', JSON.stringify(playerGroups));
+
+    // Синхронизируем с сервером для автовосстановления
+    syncConfigToServer();
 }
 
 // Переключение выбора плеера для группы

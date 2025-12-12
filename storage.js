@@ -10,6 +10,7 @@ class Storage {
     this.dataDir = join(__dirname, 'data');
     this.playersFile = join(this.dataDir, 'players.json');
     this.mediaFile = join(this.dataDir, 'media.json');
+    this.playbackStateFile = join(this.dataDir, 'playback-state.json');
 
     // Очистка старых временных файлов при инициализации
     this.cleanupTempFiles();
@@ -211,6 +212,46 @@ class Storage {
     console.log(`[STORAGE] Save result: ${result}`);
 
     return result;
+  }
+
+  // ================================================
+  // МЕТОДЫ ДЛЯ АВТОВОССТАНОВЛЕНИЯ ВОСПРОИЗВЕДЕНИЯ
+  // ================================================
+
+  // Получить конфигурацию назначений плееров (playerSelections + groups)
+  getPlaybackConfig() {
+    try {
+      if (!existsSync(this.playbackStateFile)) {
+        return { playerSelections: {}, playerGroups: [], lastUpdated: null };
+      }
+      const data = readFileSync(this.playbackStateFile, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('[STORAGE] Error reading playback config:', error);
+      return { playerSelections: {}, playerGroups: [], lastUpdated: null };
+    }
+  }
+
+  // Сохранить конфигурацию назначений плееров (атомарно)
+  savePlaybackConfig(playerSelections, playerGroups = []) {
+    try {
+      const config = {
+        playerSelections: playerSelections || {},
+        playerGroups: playerGroups || [],
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Записываем во временный файл
+      const tempFile = this.playbackStateFile + '.tmp';
+      writeFileSync(tempFile, JSON.stringify(config, null, 2));
+
+      // Атомарная замена
+      renameSync(tempFile, this.playbackStateFile);
+      return true;
+    } catch (error) {
+      console.error('[STORAGE] Error saving playback config:', error);
+      return false;
+    }
   }
 }
 

@@ -354,6 +354,219 @@ setTimeout(() => {
   globalRepeatController();
 }, 20000);
 
+// ================================================
+// АВТОВОССТАНОВЛЕНИЕ ВОСПРОИЗВЕДЕНИЯ ПРИ СТАРТЕ
+// ================================================
+
+// Функция получения primary IP сервера
+function getServerPrimaryIP() {
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'localhost';
+}
+
+async function autoRestorePlayback() {
+  logWithMs('[AUTO-RESTORE] Starting playback restoration...');
+
+  try {
+    const config = storage.getPlaybackConfig();
+    const playerSelections = config.playerSelections || {};
+    const playerGroups = config.playerGroups || [];
+
+    const playerIds = Object.keys(playerSelections);
+    logWithMs(`[AUTO-RESTORE] Found ${playerIds.length} players with file assignments`);
+    logWithMs(`[AUTO-RESTORE] Found ${playerGroups.length} groups`);
+
+    if (playerIds.length === 0) {
+      logWithMs('[AUTO-RESTORE] No players to restore');
+      return;
+    }
+
+    // Запускаем группы последовательно
+    if (playerGroups.length > 0) {
+      for (let groupIndex = 0; groupIndex < playerGroups.length; groupIndex++) {
+        const group = playerGroups[groupIndex];
+        const groupPlayerIds = group.playerIds.filter(id => playerSelections[id]); // только плееры с файлами
+
+        if (groupPlayerIds.length === 0) {
+          logWithMs(`[AUTO-RESTORE] Group "${group.name}": no players with files, skipping`);
+          continue;
+        }
+
+        const groupId = `group_${group.name}_${Date.now()}`;
+        logWithMs(`[AUTO-RESTORE] Starting group ${groupIndex+1}/${playerGroups.length} "${group.name}" (${groupId}) with ${groupPlayerIds.length} players`);
+
+        for (let i = 0; i < groupPlayerIds.length; i++) {
+          const playerId = groupPlayerIds[i];
+          const filePath = playerSelections[playerId];
+          const client = playerClients.get(playerId);
+
+          if (!client) {
+            logWithMs(`[AUTO-RESTORE] Player ${playerId} not found, skipping`);
+            continue;
+          }
+
+          // Формируем полный URL файла
+          const serverUrl = `http://${getServerPrimaryIP()}:${PORT}${filePath}`;
+
+          try {
+            const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(serverUrl);
+            await client.request(playCommand);
+            logWithMs(`[AUTO-RESTORE] Group "${group.name}": Started player ${i+1}/${groupPlayerIds.length} (${playerId})`);
+
+            // Запускаем мониторинг
+            startMonitoring(playerId, serverUrl, groupId);
+
+            // Задержка между плеерами группы
+            if (i < groupPlayerIds.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          } catch (error) {
+            logWithMs(`[AUTO-RESTORE] Error starting player ${playerId}: ${error.message}`);
+          }
+        }
+
+        // Задержка между группами
+        if (groupIndex < playerGroups.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+
+    // Запускаем оставшиеся плееры (не в группах)
+    const groupPlayerIds = new Set();
+    playerGroups.forEach(group => group.playerIds.forEach(id => groupPlayerIds.add(id)));
+
+    const soloPlayerIds = playerIds.filter(id => !groupPlayerIds.has(id));
+
+    if (soloPlayerIds.length > 0) {
+      logWithMs(`[AUTO-RESTORE] Starting ${soloPlayerIds.length} solo players`);
+
+      for (let i = 0; i < soloPlayerIds.length; i++) {
+        const playerId = soloPlayerIds[i];
+        const filePath = playerSelections[playerId];
+        const client = playerClients.get(playerId);
+
+        if (!client) {
+          logWithMs(`[AUTO-RESTORE] Player ${playerId} not found, skipping`);
+          continue;
+        }
+
+        // Формируем полный URL файла
+        const serverUrl = `http://${getServerPrimaryIP()}:${PORT}${filePath}`;
+
+        try {
+          const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(serverUrl);
+          await client.request(playCommand);
+          logWithMs(`[AUTO-RESTORE] Started solo player ${i+1}/${soloPlayerIds.length} (${playerId})`);
+
+          // Запускаем мониторинг
+          startMonitoring(playerId, serverUrl, null);
+
+          // Задержка между плеерами
+          if (i < soloPlayerIds.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (error) {
+          logWithMs(`[AUTO-RESTORE] Error starting player ${playerId}: ${error.message}`);
+        }
+      }
+    }
+
+    logWithMs('[AUTO-RESTORE] Playback restoration completed');
+  } catch (error) {
+    logWithMs(`[AUTO-RESTORE] Fatal error: ${error.message}`);
+  }
+}
+
+// Watchdog для автовосстановления - проверяет что все плееры запустились
+async function autoRestoreWatchdog() {
+  logWithMs('[AUTO-RESTORE-WATCHDOG] Checking if all players are playing...');
+
+  try {
+    const config = storage.getPlaybackConfig();
+    const playerSelections = config.playerSelections || {};
+    const playerIds = Object.keys(playerSelections);
+
+    if (playerIds.length === 0) {
+      logWithMs('[AUTO-RESTORE-WATCHDOG] No players to check');
+      return;
+    }
+
+    const notPlayingPlayers = [];
+
+    for (const playerId of playerIds) {
+      const client = playerClients.get(playerId);
+      if (!client) continue;
+
+      try {
+        const status = await client.getPlayerStatus();
+        const playerStatus = status.data?.status;
+
+        if (playerStatus !== 'play') {
+          notPlayingPlayers.push({ playerId, status: playerStatus, filePath: playerSelections[playerId] });
+        }
+      } catch (error) {
+        logWithMs(`[AUTO-RESTORE-WATCHDOG] Error checking player ${playerId}: ${error.message}`);
+        notPlayingPlayers.push({ playerId, filePath: playerSelections[playerId] });
+      }
+    }
+
+    if (notPlayingPlayers.length > 0) {
+      logWithMs(`[AUTO-RESTORE-WATCHDOG] Found ${notPlayingPlayers.length} players not playing, restarting...`);
+
+      for (const { playerId, filePath } of notPlayingPlayers) {
+        const client = playerClients.get(playerId);
+        if (!client) continue;
+
+        const serverUrl = `http://${getServerPrimaryIP()}:${PORT}${filePath}`;
+
+        try {
+          const playCommand = '/httpapi.asp?command=setPlayerCmd:play:' + encodeURIComponent(serverUrl);
+          await client.request(playCommand);
+          logWithMs(`[AUTO-RESTORE-WATCHDOG] Restarted player ${playerId}`);
+
+          // Убеждаемся что мониторинг активен
+          if (!autoRepeatState.has(playerId) || !autoRepeatState.get(playerId).monitoring) {
+            const groupId = autoRepeatState.get(playerId)?.groupId || null;
+            startMonitoring(playerId, serverUrl, groupId);
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          logWithMs(`[AUTO-RESTORE-WATCHDOG] Error restarting player ${playerId}: ${error.message}`);
+        }
+      }
+    } else {
+      logWithMs('[AUTO-RESTORE-WATCHDOG] All players are playing correctly');
+    }
+  } catch (error) {
+    logWithMs(`[AUTO-RESTORE-WATCHDOG] Fatal error: ${error.message}`);
+  }
+}
+
+// Запускаем автовосстановление через 5 секунд после старта
+// (даём время плеерам инициализироваться)
+setTimeout(() => {
+  autoRestorePlayback();
+}, 5000);
+
+// Запускаем watchdog через 10 секунд после старта (чтобы проверить что всё запустилось)
+setTimeout(() => {
+  autoRestoreWatchdog();
+}, 10000);
+
+// Повторяем watchdog каждую минуту для надёжности
+setInterval(() => {
+  autoRestoreWatchdog();
+}, 60000);
+
 // Функция получения активного клиента
 const getActiveClient = () => {
   const activePlayer = storage.getActivePlayer();
@@ -836,6 +1049,29 @@ app.post('/api/players/:id/pause', async (req, res) => {
     res.json(result);
   } catch (error) {
     logWithMs(`[PAUSE ERROR] Player ${id}: ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Синхронизация конфигурации для автовосстановления
+app.post('/api/config/sync', async (req, res) => {
+  try {
+    const { playerSelections, playerGroups } = req.body;
+
+    if (!playerSelections) {
+      return res.status(400).json({ error: 'playerSelections is required' });
+    }
+
+    const saved = storage.savePlaybackConfig(playerSelections, playerGroups || []);
+
+    if (saved) {
+      logWithMs(`[CONFIG-SYNC] Saved configuration: ${Object.keys(playerSelections).length} players, ${(playerGroups || []).length} groups`);
+      res.json({ success: true, message: 'Configuration saved' });
+    } else {
+      res.status(500).json({ error: 'Failed to save configuration' });
+    }
+  } catch (error) {
+    logWithMs(`[CONFIG-SYNC ERROR] ${error.message}`);
     res.status(500).json({ error: error.message });
   }
 });
