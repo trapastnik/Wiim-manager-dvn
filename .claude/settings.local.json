@@ -16,7 +16,9 @@
       "Bash(lsof:*)",
       "Bash(xargs kill -9)",
       "Bash(ffprobe:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(node --check:*)"
     ],
     "deny": [],
     "ask": []

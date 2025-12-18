@@ -500,8 +500,15 @@ async function autoRestoreWatchdog() {
     }
 
     const notPlayingPlayers = [];
+    const manuallyStoppedCount = 0;
 
     for (const playerId of playerIds) {
+      // КРИТИЧНО: Проверяем был ли ручной STOP
+      if (manualStops.has(playerId)) {
+        logWithMs(`[AUTO-RESTORE-WATCHDOG] Player ${playerId} was manually stopped, skipping auto-restart`);
+        continue;
+      }
+
       const client = playerClients.get(playerId);
       if (!client) continue;
 
@@ -987,6 +994,13 @@ app.post('/api/players/:id/play', async (req, res) => {
         logWithMs(`[PLAY] Player ${id}: Removed manual stop flag`);
       }
 
+      // КРИТИЧНО: Сохраняем плеер в playerSelections для автовосстановления после перезагрузки
+      const config = storage.getPlaybackConfig();
+      const mediaPath = new URL(fileUrl).pathname;
+      config.playerSelections[id] = mediaPath; // Сохраняем путь /media/filename
+      storage.savePlaybackConfig(config.playerSelections, config.playerGroups || []);
+      logWithMs(`[PLAY] Player ${id}: Added to auto-restore (file: ${mediaPath})`);
+
       // Проверяем статус АСИНХРОННО (не блокируя ответ клиенту)
       // Fire-and-forget - для диагностики
       setImmediate(async () => {
@@ -1062,10 +1076,24 @@ app.post('/api/config/sync', async (req, res) => {
       return res.status(400).json({ error: 'playerSelections is required' });
     }
 
-    const saved = storage.savePlaybackConfig(playerSelections, playerGroups || []);
+    // КРИТИЧНО: Фильтруем остановленные вручную плееры
+    // Не позволяем фронтенду восстановить их в playerSelections после STOP
+    const filteredSelections = {};
+    let filteredCount = 0;
+
+    for (const [playerId, filePath] of Object.entries(playerSelections)) {
+      if (manualStops.has(playerId)) {
+        logWithMs(`[CONFIG-SYNC] Player ${playerId} was manually stopped, NOT adding to auto-restore`);
+        filteredCount++;
+        continue;
+      }
+      filteredSelections[playerId] = filePath;
+    }
+
+    const saved = storage.savePlaybackConfig(filteredSelections, playerGroups || []);
 
     if (saved) {
-      logWithMs(`[CONFIG-SYNC] Saved configuration: ${Object.keys(playerSelections).length} players, ${(playerGroups || []).length} groups`);
+      logWithMs(`[CONFIG-SYNC] Saved configuration: ${Object.keys(filteredSelections).length} players (filtered ${filteredCount}), ${(playerGroups || []).length} groups`);
       res.json({ success: true, message: 'Configuration saved' });
     } else {
       res.status(500).json({ error: 'Failed to save configuration' });
@@ -1105,6 +1133,15 @@ app.post('/api/players/:id/stop', async (req, res) => {
     // Помечаем как ручную остановку для глобального контроллера
     manualStops.add(id);
     logWithMs(`[STOP] Player ${id} marked as manually stopped`);
+
+    // КРИТИЧНО: Удаляем плеер из playerSelections чтобы после перезагрузки НЕ запускался
+    const config = storage.getPlaybackConfig();
+    if (config.playerSelections && config.playerSelections[id]) {
+      const filePath = config.playerSelections[id];
+      delete config.playerSelections[id];
+      storage.savePlaybackConfig(config.playerSelections, config.playerGroups || []);
+      logWithMs(`[STOP] Player ${id} removed from auto-restore (was playing: ${filePath})`);
+    }
 
     res.json(result);
   } catch (error) {
