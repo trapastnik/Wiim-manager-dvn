@@ -18,7 +18,8 @@
       "Bash(ffprobe:*)",
       "Bash(find:*)",
       "Bash(git add:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
     "ask": []

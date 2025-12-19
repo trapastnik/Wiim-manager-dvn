@@ -1106,6 +1106,25 @@ app.post('/api/players/:id/pause', async (req, res) => {
   }
 });
 
+// Очистка битых статусов (несуществующих плееров из playback-state)
+app.post('/api/config/cleanup', async (req, res) => {
+  try {
+    logWithMs('[CLEANUP] Starting cleanup of broken player states...');
+    const result = storage.cleanupPlaybackState();
+
+    if (result.success) {
+      logWithMs(`[CLEANUP] Cleanup completed: removed ${result.removedSelections} selections, ${result.removedGroups} groups`);
+      res.json(result);
+    } else {
+      logWithMs(`[CLEANUP] Cleanup failed: ${result.error}`);
+      res.status(500).json(result);
+    }
+  } catch (error) {
+    logWithMs(`[CLEANUP ERROR] ${error.message}`);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Синхронизация конфигурации для автовосстановления
 app.post('/api/config/sync', async (req, res) => {
   try {

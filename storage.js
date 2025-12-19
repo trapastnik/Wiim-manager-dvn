@@ -285,6 +285,71 @@ class Storage {
       return false;
     }
   }
+
+  // Очистка битых статусов (несуществующих плееров из playback-state)
+  cleanupPlaybackState() {
+    try {
+      const playersData = this.getPlayers();
+      const config = this.getPlaybackConfig();
+
+      const validPlayerIds = new Set(playersData.players.map(p => p.id));
+
+      // Фильтруем playerSelections - оставляем только существующих плееров
+      const cleanedSelections = {};
+      let removedSelectionsCount = 0;
+
+      for (const [playerId, filePath] of Object.entries(config.playerSelections || {})) {
+        if (validPlayerIds.has(playerId)) {
+          cleanedSelections[playerId] = filePath;
+        } else {
+          removedSelectionsCount++;
+          console.log(`[CLEANUP] Removed dead player selection: ${playerId} → ${filePath}`);
+        }
+      }
+
+      // Фильтруем playerGroups - удаляем группы с несуществующими плеерами
+      const cleanedGroups = [];
+      let removedGroupsCount = 0;
+
+      for (const group of (config.playerGroups || [])) {
+        const validPlayers = group.playerIds.filter(id => validPlayerIds.has(id));
+
+        if (validPlayers.length > 0) {
+          cleanedGroups.push({
+            ...group,
+            playerIds: validPlayers
+          });
+
+          const removed = group.playerIds.length - validPlayers.length;
+          if (removed > 0) {
+            console.log(`[CLEANUP] Group "${group.name}": removed ${removed} dead players`);
+          }
+        } else {
+          removedGroupsCount++;
+          console.log(`[CLEANUP] Removed empty group: "${group.name}"`);
+        }
+      }
+
+      // Сохраняем очищенную конфигурацию
+      const saved = this.savePlaybackConfig(cleanedSelections, cleanedGroups);
+
+      if (saved) {
+        console.log(`[CLEANUP] Summary: removed ${removedSelectionsCount} dead selections, ${removedGroupsCount} empty groups`);
+        return {
+          success: true,
+          removedSelections: removedSelectionsCount,
+          removedGroups: removedGroupsCount,
+          validSelections: Object.keys(cleanedSelections).length,
+          validGroups: cleanedGroups.length
+        };
+      }
+
+      return { success: false, error: 'Failed to save cleaned config' };
+    } catch (error) {
+      console.error('[CLEANUP] Error cleaning playback state:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 export default new Storage();

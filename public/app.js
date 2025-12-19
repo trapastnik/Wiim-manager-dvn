@@ -332,6 +332,43 @@ async function removePlayer(playerId) {
     }
 }
 
+// Очистка битых статусов (несуществующих плееров из playback-state)
+async function cleanupBrokenStates() {
+    if (!confirm('Удалить все битые записи из конфигурации?\n\nЭто удалит записи о плеерах, которых больше нет в списке устройств.')) {
+        return;
+    }
+
+    try {
+        addMessage('Очистка битых записей...', 'info');
+
+        const response = await fetch('/api/config/cleanup', {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const message = `Очистка завершена:\n` +
+                `✅ Удалено записей: ${result.removedSelections}\n` +
+                `✅ Удалено групп: ${result.removedGroups}\n` +
+                `⚪ Осталось записей: ${result.validSelections}\n` +
+                `⚪ Осталось групп: ${result.validGroups}`;
+
+            addMessage(message.replace(/\n/g, ' '), 'success');
+
+            // Обновляем данные
+            loadPlayers();
+            await refreshAllPlayers();
+
+            console.log('[CLEANUP] Result:', result);
+        } else {
+            addMessage(`Ошибка очистки: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        addMessage(`Ошибка очистки: ${error.message}`, 'error');
+    }
+}
+
 // === УПРАВЛЕНИЕ ПЛЕЕРОМ (сохраняем существующий код) ===
 async function refreshStatus() {
     try {

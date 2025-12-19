@@ -1,11 +1,5 @@
 {
   "playerSelections": {
-    "1766063415706_idbg7quwe": "/media/17b877198857fa4f8a8ee33a110fe046",
-    "1766063415708_1de45sx9g": "/media/6125ed73254746fcf436fd6a067ae83e",
-    "1766063415707_3zjons30z": "/media/432f4e1b5568b13e35379fddea7b3aa8",
-    "1766063415707_gvd2dqp02": "/media/2ce522183ab9885e9e7aff6dc45804ca",
-    "1766063415707_o99y1rbua": "/media/2ce522183ab9885e9e7aff6dc45804ca",
-    "1766063415708_dkgkqreln": "/media/09b49714df06740e976e14bba93365f0",
     "1766066019307_wz00yf8jp": "/media/d8f17789ccc32f59ce47609bc2ed1cab",
     "1766065839212_olazsgbnt": "/media/17b877198857fa4f8a8ee33a110fe046",
     "1766065839214_6tstml5qe": "/media/432f4e1b5568b13e35379fddea7b3aa8",
@@ -13,15 +7,6 @@
     "1766065839218_omp73zpo5": "/media/09b49714df06740e976e14bba93365f0",
     "1766065839220_slfmz215m": "/media/6125ed73254746fcf436fd6a067ae83e"
   },
-  "playerGroups": [
-    {
-      "id": "group_1766063495256",
-      "name": "6",
-      "playerIds": [
-        "1766063415706_idbg7quwe",
-        "1766063415708_1de45sx9g"
-      ]
-    }
-  ],
-  "lastUpdated": "2025-12-18T13:55:59.327Z"
+  "playerGroups": [],
+  "lastUpdated": "2025-12-19T17:45:00.968Z"
 }
