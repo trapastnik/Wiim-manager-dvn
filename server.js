@@ -627,15 +627,45 @@ app.post('/api/players/scan', async (req, res) => {
     const scanner = new NetworkScanner(subnet);
     const devices = await scanner.quickScan();
 
+    let newCount = 0;
+    let updatedCount = 0;
+    let unchangedCount = 0;
+
     devices.forEach(device => {
       // Используем реальное имя из устройства если доступно
       const deviceName = device.data?.DeviceName || `WiiM Player (${device.ip})`;
+      const deviceUUID = device.data?.uuid || null; // MAC-адрес для идентификации
+
+      // Проверяем существует ли плеер ДО добавления
+      const playersDataBefore = storage.getPlayers();
+      const existingByUUID = deviceUUID ? playersDataBefore.players.find(p => p.uuid === deviceUUID) : null;
+      const existingByIP = playersDataBefore.players.find(p => p.ip === device.ip);
+      const existingByName = playersDataBefore.players.find(p => p.name === deviceName);
+
+      const existed = existingByUUID || existingByIP || existingByName;
 
       storage.addPlayer({
         ip: device.ip,
         name: deviceName,
+        uuid: deviceUUID,
         useHttps: USE_HTTPS
       });
+
+      // Подсчитываем статистику
+      if (!existed) {
+        newCount++;
+        console.log(`[SCAN] ✅ Found NEW player: "${deviceName}" at ${device.ip}${deviceUUID ? ` (UUID: ${deviceUUID})` : ''}`);
+      } else if (existingByIP && existingByIP.name === deviceName && existingByIP.uuid === deviceUUID) {
+        unchangedCount++;
+        console.log(`[SCAN] ⚪ Player "${deviceName}" at ${device.ip} - no changes`);
+      } else {
+        updatedCount++;
+        if (existingByName && existingByName.ip !== device.ip) {
+          console.log(`[SCAN] 🔄 Player "${deviceName}" IP changed: ${existingByName.ip} → ${device.ip}`);
+        } else if (existingByIP && existingByIP.name !== deviceName) {
+          console.log(`[SCAN] 🔄 Player at ${device.ip} name changed: "${existingByIP.name}" → "${deviceName}"`);
+        }
+      }
 
       const playersData = storage.getPlayers();
       const addedPlayer = playersData.players.find(p => p.ip === device.ip);
@@ -644,7 +674,16 @@ app.post('/api/players/scan', async (req, res) => {
       }
     });
 
-    res.json({ success: true, found: devices.length, devices, subnet });
+    console.log(`[SCAN] Summary: ${newCount} new, ${updatedCount} updated, ${unchangedCount} unchanged`);
+    res.json({
+      success: true,
+      found: devices.length,
+      new: newCount,
+      updated: updatedCount,
+      unchanged: unchangedCount,
+      devices,
+      subnet
+    });
   } catch (error) {
     console.error('Ошибка сканирования:', error);
     res.status(500).json({ error: error.message });

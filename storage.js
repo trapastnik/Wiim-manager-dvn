@@ -79,21 +79,53 @@ class Storage {
   addPlayer(player) {
     const data = this.getPlayers();
 
-    // Проверка на дубликаты
-    const exists = data.players.find(p => p.ip === player.ip);
-    if (exists) {
-      // Обновляем существующий (сохраняя его ID!)
-      const existingId = exists.id;
-      Object.assign(exists, player);
-      exists.id = existingId; // Гарантируем, что ID не изменится
+    // Многоуровневая проверка на дубликаты:
+    // 1. По UUID (MAC-адрес) - самый надёжный способ
+    // 2. По IP-адресу
+    // 3. По имени устройства
+
+    let existingPlayer = null;
+
+    // Приоритет 1: UUID (если доступен из WiiM API)
+    if (player.uuid) {
+      existingPlayer = data.players.find(p => p.uuid === player.uuid);
+      if (existingPlayer) {
+        console.log(`[STORAGE] Player found by UUID: ${player.uuid} → updating IP: ${existingPlayer.ip} → ${player.ip}`);
+      }
+    }
+
+    // Приоритет 2: IP-адрес
+    if (!existingPlayer) {
+      existingPlayer = data.players.find(p => p.ip === player.ip);
+      if (existingPlayer) {
+        console.log(`[STORAGE] Player found by IP: ${player.ip} → updating name: "${existingPlayer.name}" → "${player.name}"`);
+      }
+    }
+
+    // Приоритет 3: Имя устройства (если IP изменился, но имя осталось)
+    if (!existingPlayer && player.name) {
+      existingPlayer = data.players.find(p => p.name === player.name);
+      if (existingPlayer) {
+        console.log(`[STORAGE] Player "${player.name}" found by name → updating IP: ${existingPlayer.ip} → ${player.ip}`);
+      }
+    }
+
+    if (existingPlayer) {
+      // Обновляем существующий плеер (сохраняя его ID!)
+      const existingId = existingPlayer.id;
+      Object.assign(existingPlayer, player);
+      existingPlayer.id = existingId; // Гарантируем, что ID не изменится
+      existingPlayer.updatedAt = new Date().toISOString();
     } else {
-      // Генерируем уникальный ID: timestamp + случайное число
-      const uniqueId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      data.players.push({
+      // Новый плеер - добавляем
+      const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      const newPlayer = {
         id: uniqueId,
         ...player,
         addedAt: new Date().toISOString()
-      });
+      };
+      data.players.push(newPlayer);
+      console.log(`[STORAGE] New player added: "${player.name}" at ${player.ip}`);
     }
 
     // Если это первый плеер, делаем его активным
