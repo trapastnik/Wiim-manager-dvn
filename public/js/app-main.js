@@ -1,0 +1,162 @@
+/**
+ * Главный модуль приложения (новая модульная версия)
+ * Импортирует все модули и инициализирует приложение
+ */
+
+// === ИМПОРТЫ ===
+
+// State Management
+import { appState } from './state/AppState.js';
+
+// UI Modules
+import { addMessage, clearMessages } from './ui/messages.js';
+import { switchTab } from './ui/tabs.js';
+import * as PlayersUI from './ui/players-ui.js';
+import * as MediaUI from './ui/media-ui.js';
+import * as GroupsUI from './ui/groups-ui.js';
+
+// API Modules
+import * as PlayersAPI from './api/players-api.js';
+import * as MediaAPI from './api/media-api.js';
+import * as ConfigAPI from './api/config-api.js';
+
+// Services
+import * as PlayerService from './services/player-service.js';
+import * as RefreshService from './services/refresh-service.js';
+
+// Utils
+import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './utils/format.js';
+import * as DOM from './utils/dom.js';
+
+// === ЭКСПОРТ В ГЛОБАЛЬНУЮ ОБЛАСТЬ ДЛЯ СОВМЕСТИМОСТИ С HTML ===
+// Это позволяет использовать функции в onclick обработчиках
+
+// State
+window.appState = appState;
+
+// UI - Messages & Tabs
+window.addMessage = addMessage;
+window.clearMessages = clearMessages;
+window.switchTab = switchTab;
+
+// UI - Players
+window.loadPlayers = PlayersUI.loadPlayers;
+window.renderPlayers = PlayersUI.renderPlayers;
+window.scanPlayers = PlayersUI.scanPlayers;
+window.closeScanModal = PlayersUI.closeScanModal;
+window.showAddPlayer = PlayersUI.showAddPlayer;
+window.hideAddPlayer = PlayersUI.hideAddPlayer;
+window.addPlayerManual = PlayersUI.addPlayerManual;
+window.activatePlayer = PlayersUI.activatePlayer;
+window.removePlayer = PlayersUI.removePlayer;
+window.getPlayerName = PlayersUI.getPlayerName;
+
+// UI - Media
+window.loadMedia = MediaUI.loadMedia;
+window.renderMedia = MediaUI.renderMedia;
+window.uploadFile = MediaUI.uploadFile;
+window.deleteMediaFile = MediaUI.deleteMediaFile;
+window.playMediaFile = MediaUI.playMediaFile;
+window.handleFileSelect = MediaUI.handleFileSelect;
+
+// UI - Groups
+window.togglePlayerSelection = GroupsUI.togglePlayerSelection;
+window.updateGroupSelectionUI = GroupsUI.updateGroupSelectionUI;
+window.createPlayerGroup = GroupsUI.createPlayerGroup;
+window.clearPlayerSelection = GroupsUI.clearPlayerSelection;
+window.deletePlayerGroup = GroupsUI.deletePlayerGroup;
+window.renderPlayerGroups = GroupsUI.renderPlayerGroups;
+window.loadPlayerGroups = GroupsUI.loadPlayerGroups;
+
+// Services - Player
+window.playMediaOnAllPlayers = PlayerService.playMediaOnAllPlayers;
+window.stopAll = PlayerService.stopAll;
+window.playAll = PlayerService.playAll;
+window.refreshAllPlayers = PlayerService.refreshAllPlayers;
+window.playBeep = PlayerService.playBeep;
+window.setVolume = PlayerService.setVolume;
+window.setLoopMode = PlayerService.setLoopMode;
+
+// Services - Refresh
+window.startAdaptiveRefresh = RefreshService.startAdaptiveRefresh;
+window.stopAdaptiveRefresh = RefreshService.stopAdaptiveRefresh;
+window.startTemporaryAutoRefresh = RefreshService.startTemporaryAutoRefresh;
+
+// Utils
+window.formatFileSize = formatFileSize;
+window.formatTime = formatTime;
+window.formatTimestamp = formatTimestamp;
+window.formatUptime = formatUptime;
+window.DOM = DOM;
+
+// API (для использования в других модулях)
+window.PlayersAPI = PlayersAPI;
+window.MediaAPI = MediaAPI;
+window.ConfigAPI = ConfigAPI;
+
+// === ИНИЦИАЛИЗАЦИЯ ===
+console.log('✅ Модульная система загружена');
+console.log('📦 Загружено модулей:', {
+  state: 'AppState',
+  ui: ['messages', 'tabs', 'players-ui', 'media-ui', 'groups-ui'],
+  api: ['players-api', 'media-api', 'config-api'],
+  services: ['player-service', 'refresh-service'],
+  utils: ['format', 'dom']
+});
+
+// Инициализация приложения при загрузке DOM
+document.addEventListener('DOMContentLoaded', async () => {
+  addMessage('Инициализация приложения...', 'info');
+
+  try {
+    // Получаем информацию о сервере
+    const serverInfo = await ConfigAPI.getServerInfo();
+    appState.setServerInfo(serverInfo);
+    console.log('Server info:', serverInfo);
+
+    // Проверяем localhost
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      addMessage(`⚠️ Вы используете localhost. Реальный IP сервера: ${serverInfo.primaryAddress}`, 'warning');
+      addMessage(`Откройте интерфейс по адресу: http://${serverInfo.primaryAddress}:${serverInfo.port}`, 'info');
+    }
+
+    // Загружаем конфигурацию
+    const config = await ConfigAPI.getConfig();
+    console.log('Config loaded:', config);
+
+    // Загружаем данные
+    await loadPlayers();
+    await loadMedia();
+    await loadPlayerGroups();
+    await refreshAllPlayers();
+
+    // Запускаем автообновление
+    startAdaptiveRefresh();
+
+    addMessage('Приложение готово к работе!', 'success');
+  } catch (error) {
+    console.error('Ошибка инициализации:', error);
+    addMessage(`Ошибка инициализации: ${error.message}`, 'error');
+  }
+});
+
+// Экспортируем для использования в других модулях
+export {
+  appState,
+  addMessage,
+  clearMessages,
+  switchTab,
+  PlayersUI,
+  MediaUI,
+  GroupsUI,
+  PlayersAPI,
+  MediaAPI,
+  ConfigAPI,
+  PlayerService,
+  RefreshService,
+  formatFileSize,
+  formatTime,
+  formatTimestamp,
+  formatUptime,
+  DOM
+};

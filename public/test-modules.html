@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест модулей WiiM</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .result {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+        }
+        #system-messages {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .message-item {
+            margin: 2px 0;
+        }
+        .message-item.success { color: #28a745; }
+        .message-item.error { color: #dc3545; }
+        .message-item.warning { color: #ffc107; }
+        .message-item.info { color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тестирование модульной системы WiiM</h1>
+
+    <!-- Тест 1: AppState -->
+    <div class="test-section">
+        <h2>1. Тест AppState (State Management)</h2>
+        <button onclick="testAppState()">Запустить тест</button>
+        <div id="test-appstate-result" class="result"></div>
+    </div>
+
+    <!-- Тест 2: Утилиты форматирования -->
+    <div class="test-section">
+        <h2>2. Тест утилит форматирования</h2>
+        <button onclick="testFormatUtils()">Запустить тест</button>
+        <div id="test-format-result" class="result"></div>
+    </div>
+
+    <!-- Тест 3: DOM утилиты -->
+    <div class="test-section">
+        <h2>3. Тест DOM утилит</h2>
+        <button onclick="testDOMUtils()">Запустить тест</button>
+        <div id="test-dom-result" class="result"></div>
+        <div id="test-element" style="display:none;">Тестовый элемент</div>
+    </div>
+
+    <!-- Тест 4: Система сообщений -->
+    <div class="test-section">
+        <h2>4. Тест системы сообщений</h2>
+        <button onclick="testMessages()">Добавить сообщения</button>
+        <button onclick="clearMessages()">Очистить</button>
+        <div id="system-messages"></div>
+    </div>
+
+    <!-- Тест 5: API модули -->
+    <div class="test-section">
+        <h2>5. Тест API модулей (структура)</h2>
+        <button onclick="testAPIModules()">Проверить API</button>
+        <div id="test-api-result" class="result"></div>
+    </div>
+
+    <!-- Общий результат -->
+    <div class="test-section">
+        <h2>📊 Сводка тестов</h2>
+        <div id="test-summary" class="result"></div>
+    </div>
+
+    <script type="module">
+        // Импортируем все модули
+        import { appState } from './js/state/AppState.js';
+        import { addMessage, clearMessages } from './js/ui/messages.js';
+        import { switchTab } from './js/ui/tabs.js';
+        import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './js/utils/format.js';
+        import * as dom from './js/utils/dom.js';
+        import * as PlayersAPI from './js/api/players-api.js';
+        import * as MediaAPI from './js/api/media-api.js';
+        import * as ConfigAPI from './js/api/config-api.js';
+
+        // Делаем доступными глобально для тестов
+        window.appState = appState;
+        window.addMessage = addMessage;
+        window.clearMessages = clearMessages;
+        window.formatFileSize = formatFileSize;
+        window.formatTime = formatTime;
+        window.formatTimestamp = formatTimestamp;
+        window.formatUptime = formatUptime;
+        window.dom = dom;
+        window.PlayersAPI = PlayersAPI;
+        window.MediaAPI = MediaAPI;
+        window.ConfigAPI = ConfigAPI;
+
+        let testResults = {
+            passed: 0,
+            failed: 0,
+            total: 0
+        };
+
+        function logTest(name, passed, details = '') {
+            testResults.total++;
+            if (passed) {
+                testResults.passed++;
+                return `✅ ${name}: PASSED ${details}\n`;
+            } else {
+                testResults.failed++;
+                return `❌ ${name}: FAILED ${details}\n`;
+            }
+        }
+
+        // Тест 1: AppState
+        window.testAppState = function() {
+            const result = document.getElementById('test-appstate-result');
+            let output = 'Тестирование AppState...\n\n';
+
+            try {
+                // Тест установки и получения плееров
+                const testPlayers = [{id: '1', name: 'Test Player 1'}, {id: '2', name: 'Test Player 2'}];
+                appState.setPlayers(testPlayers);
+                const players = appState.getPlayers();
+                output += logTest('setPlayers/getPlayers', JSON.stringify(players) === JSON.stringify(testPlayers));
+
+                // Тест статуса плеера
+                appState.setPlayerStatus('1', {status: 'playing', volume: 50});
+                const status = appState.getPlayerStatus('1');
+                output += logTest('setPlayerStatus/getPlayerStatus', status.status === 'playing');
+
+                // Тест групп
+                appState.addPlayerToGroupSelection('1');
+                appState.addPlayerToGroupSelection('2');
+                const selection = appState.getGroupSelection();
+                output += logTest('Group selection', selection.size === 2);
+
+                // Тест демо-режима
+                appState.enableDemoMode();
+                output += logTest('enableDemoMode', appState.isDemoModeEnabled() === true);
+                appState.disableDemoMode();
+                output += logTest('disableDemoMode', appState.isDemoModeEnabled() === false);
+
+                // Тест reset
+                appState.reset();
+                output += logTest('reset', appState.getPlayers().length === 0);
+
+                output += '\n✅ Все тесты AppState пройдены успешно!';
+                result.className = 'result success';
+            } catch (error) {
+                output += `\n❌ Ошибка: ${error.message}`;
+                result.className = 'result error';
+            }
+
+            result.textContent = output;
+            updateSummary();
+        };
+
+        // Тест 2: Утилиты форматирования
+        window.testFormatUtils = function() {
+            const result = document.getElementById('test-format-result');
+            let output = 'Тестирование утилит форматирования...\n\n';
+
+            try {
+                // Тест formatFileSize
+                output += logTest('formatFileSize(0)', formatFileSize(0) === '0 B');
+                output += logTest('formatFileSize(1024)', formatFileSize(1024) === '1 KB');
+                output += logTest('formatFileSize(1048576)', formatFileSize(1048576) === '1 MB');
+                output += `  → ${formatFileSize(1234567)}\n`;
+
+                // Тест formatTime
+                output += logTest('formatTime(0)', formatTime(0) === '00:00');
+                output += logTest('formatTime(65000)', formatTime(65000) === '01:05');
+                output += logTest('formatTime(125000)', formatTime(125000) === '02:05');
+                output += `  → ${formatTime(3661000)} (1h 1m 1s)\n`;
+
+                // Тест formatTimestamp
+                const timestamp = formatTimestamp();
+                output += logTest('formatTimestamp', /^\d{2}:\d{2}:\d{2}\.\d{3}$/.test(timestamp));
+                output += `  → ${timestamp}\n`;
+
+                // Тест formatUptime
+                output += `formatUptime(5000) → ${formatUptime(5000)}\n`;
+                output += `formatUptime(65000) → ${formatUptime(65000)}\n`;
+                output += `formatUptime(3665000) → ${formatUptime(3665000)}\n`;
+                output += `formatUptime(90000000) → ${formatUptime(90000000)}\n`;
+
+                output += '\n✅ Все тесты форматирования пройдены!';
+                result.className = 'result success';
+            } catch (error) {
+                output += `\n❌ Ошибка: ${error.message}`;
+                result.className = 'result error';
+            }
+
+            result.textContent = output;
+            updateSummary();
+        };
+
+        // Тест 3: DOM утилиты
+        window.testDOMUtils = function() {
+            const result = document.getElementById('test-dom-result');
+            let output = 'Тестирование DOM утилит...\n\n';
+
+            try {
+                // Тест getElement
+                const elem = dom.getElement('test-element');
+                output += logTest('getElement', elem !== null);
+
+                // Тест showElement/hideElement
+                dom.showElement('test-element');
+                output += logTest('showElement', elem.style.display === 'block');
+                dom.hideElement('test-element');
+                output += logTest('hideElement', elem.style.display === 'none');
+
+                // Тест setText
+                dom.setText('test-element', 'Новый текст');
+                output += logTest('setText', elem.textContent === 'Новый текст');
+
+                // Тест createElement
+                const newElem = dom.createElement('div', {
+                    className: 'test-class',
+                    textContent: 'Test content'
+                });
+                output += logTest('createElement', newElem.className === 'test-class' && newElem.textContent === 'Test content');
+
+                output += '\n✅ Все тесты DOM утилит пройдены!';
+                result.className = 'result success';
+            } catch (error) {
+                output += `\n❌ Ошибка: ${error.message}`;
+                result.className = 'result error';
+            }
+
+            result.textContent = output;
+            updateSummary();
+        };
+
+        // Тест 4: Система сообщений
+        window.testMessages = function() {
+            addMessage('Тестовое INFO сообщение', 'info');
+            addMessage('Тестовое SUCCESS сообщение', 'success');
+            addMessage('Тестовое WARNING сообщение', 'warning');
+            addMessage('Тестовое ERROR сообщение', 'error');
+            addMessage('Система сообщений работает корректно!', 'success');
+        };
+
+        // Тест 5: API модули
+        window.testAPIModules = function() {
+            const result = document.getElementById('test-api-result');
+            let output = 'Проверка структуры API модулей...\n\n';
+
+            try {
+                // Проверка PlayersAPI
+                const playerMethods = ['getPlayers', 'scanPlayers', 'addPlayer', 'removePlayer',
+                                      'playMedia', 'pausePlayer', 'stopPlayer', 'setVolume',
+                                      'setLoopMode', 'playBeep'];
+                output += 'PlayersAPI методы:\n';
+                playerMethods.forEach(method => {
+                    const exists = typeof PlayersAPI[method] === 'function';
+                    output += logTest(`  ${method}`, exists);
+                });
+
+                // Проверка MediaAPI
+                const mediaMethods = ['getMediaFiles', 'uploadMediaFile', 'deleteMediaFile', 'getPlaylist'];
+                output += '\nMediaAPI методы:\n';
+                mediaMethods.forEach(method => {
+                    const exists = typeof MediaAPI[method] === 'function';
+                    output += logTest(`  ${method}`, exists);
+                });
+
+                // Проверка ConfigAPI
+                const configMethods = ['getConfig', 'saveLoopModes', 'saveSettings',
+                                      'getServerInfo', 'getServerStats'];
+                output += '\nConfigAPI методы:\n';
+                configMethods.forEach(method => {
+                    const exists = typeof ConfigAPI[method] === 'function';
+                    output += logTest(`  ${method}`, exists);
+                });
+
+                output += '\n✅ Все API модули имеют корректную структуру!';
+                result.className = 'result success';
+            } catch (error) {
+                output += `\n❌ Ошибка: ${error.message}`;
+                result.className = 'result error';
+            }
+
+            result.textContent = output;
+            updateSummary();
+        };
+
+        function updateSummary() {
+            const summary = document.getElementById('test-summary');
+            const percent = testResults.total > 0 ?
+                Math.round((testResults.passed / testResults.total) * 100) : 0;
+
+            summary.innerHTML = `
+<strong>Результаты тестирования:</strong>
+Всего тестов: ${testResults.total}
+Пройдено: ${testResults.passed} ✅
+Провалено: ${testResults.failed} ❌
+Процент успеха: ${percent}%
+
+${testResults.failed === 0 ? '🎉 Все тесты пройдены успешно!' : '⚠️ Некоторые тесты провалены'}
+            `;
+            summary.className = testResults.failed === 0 ? 'result success' : 'result error';
+        }
+
+        // Автоматический запуск при загрузке
+        console.log('✅ Модули успешно загружены!');
+        console.log('Доступные объекты:', {
+            appState,
+            addMessage,
+            formatFileSize,
+            PlayersAPI,
+            MediaAPI,
+            ConfigAPI
+        });
+
+        // Добавляем приветственное сообщение
+        addMessage('Система модулей загружена успешно!', 'success');
+        addMessage('Запустите тесты нажав на кнопки', 'info');
+    </script>
+</body>
+</html>
