@@ -124,7 +124,6 @@ const initializePlayers = () => {
     console.log(`  ID: ${player.id} → IP: ${player.ip} → Имя: ${player.name}`);
   });
   console.log(`Загружено плееров: ${data.players.length}`);
-  console.log(`Активный плеер: ${data.activePlayer}`);
 };
 
 initializePlayers();
@@ -574,12 +573,6 @@ setInterval(() => {
   autoRestoreWatchdog();
 }, 60000);
 
-// Функция получения активного клиента
-const getActiveClient = () => {
-  const activePlayer = storage.getActivePlayer();
-  if (!activePlayer) return null;
-  return playerClients.get(activePlayer.id);
-};
 
 console.log('=== WiiM Web Control ===');
 console.log('PORT:', PORT);
@@ -740,141 +733,6 @@ app.post('/api/players/:id/activate', (req, res) => {
   }
 });
 
-// API ENDPOINTS - PLAYER CONTROL (сохраняем все существующие)
-
-app.get('/api/status', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const status = await client.getPlayerStatus();
-    res.json(status);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.get('/api/info', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const info = await client.getStatusInfo();
-    res.json(info);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/control/play', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.play();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/control/pause', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.pause();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/control/stop', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.stop();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/control/next', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.next();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/control/prev', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.prev();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/volume/set', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const { volume } = req.body;
-    if (volume === undefined) return res.status(400).json({ error: 'Volume parameter required' });
-    const result = await client.setVolume(volume);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/volume/up', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.volumeUp();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/volume/down', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.volumeDown();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/volume/mute', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.mute();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-app.post('/api/volume/unmute', async (req, res) => {
-  try {
-    const client = getActiveClient();
-    if (!client) return res.status(404).json({ error: 'No active player' });
-    const result = await client.unmute();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 // API ENDPOINTS - MEDIA
 
@@ -1162,6 +1020,121 @@ app.post('/api/config/sync', async (req, res) => {
   }
 });
 
+// Получение ВСЕЙ конфигурации (playback + UI)
+app.get('/api/config', (req, res) => {
+  try {
+    const playbackConfig = storage.getPlaybackConfig();
+    const uiConfig = storage.getUIConfig();
+
+    const fullConfig = {
+      playerSelections: playbackConfig.playerSelections || {},
+      playerGroups: playbackConfig.playerGroups || [],
+      playerLoopModes: uiConfig.playerLoopModes || {},
+      playerVolumes: uiConfig.playerVolumes || {},
+      appSettings: uiConfig.appSettings || { beepSoundUrl: 'default' },
+      messagesPanelWidth: uiConfig.messagesPanelWidth || null,
+      loopExperimentalSettings: uiConfig.loopExperimentalSettings || {
+        useWiimNativeLoop: true,
+        useClientMonitoring: false
+      }
+    };
+
+    res.json(fullConfig);
+  } catch (error) {
+    logWithMs(`[CONFIG-GET ERROR] ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Обновление loopModes
+app.post('/api/config/loop-modes', (req, res) => {
+  try {
+    const { playerLoopModes } = req.body;
+
+    if (!playerLoopModes) {
+      return res.status(400).json({ error: 'playerLoopModes is required' });
+    }
+
+    const saved = storage.updateLoopModes(playerLoopModes);
+
+    if (saved) {
+      res.json({ success: true, message: 'Loop modes saved' });
+    } else {
+      res.status(500).json({ error: 'Failed to save loop modes' });
+    }
+  } catch (error) {
+    logWithMs(`[LOOP-MODES ERROR] ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Обновление appSettings
+app.post('/api/config/settings', (req, res) => {
+  try {
+    const { appSettings } = req.body;
+
+    if (!appSettings) {
+      return res.status(400).json({ error: 'appSettings is required' });
+    }
+
+    const saved = storage.updateAppSettings(appSettings);
+
+    if (saved) {
+      res.json({ success: true, message: 'Settings saved' });
+    } else {
+      res.status(500).json({ error: 'Failed to save settings' });
+    }
+  } catch (error) {
+    logWithMs(`[SETTINGS ERROR] ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Обновление ширины панели сообщений
+app.post('/api/config/panel-width', (req, res) => {
+  try {
+    const { width } = req.body;
+
+    if (typeof width !== 'number') {
+      return res.status(400).json({ error: 'width must be a number' });
+    }
+
+    const saved = storage.updateMessagesPanelWidth(width);
+
+    if (saved) {
+      res.json({ success: true, message: 'Panel width saved' });
+    } else {
+      res.status(500).json({ error: 'Failed to save panel width' });
+    }
+  } catch (error) {
+    logWithMs(`[PANEL-WIDTH ERROR] ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Сохранение экспериментальных настроек loop mode
+app.post('/api/config/loop-experimental', (req, res) => {
+  try {
+    const { loopExperimentalSettings } = req.body;
+
+    if (!loopExperimentalSettings || typeof loopExperimentalSettings !== 'object') {
+      return res.status(400).json({ error: 'loopExperimentalSettings must be an object' });
+    }
+
+    const saved = storage.updateLoopExperimentalSettings(loopExperimentalSettings);
+
+    if (saved) {
+      logWithMs(`[LOOP-EXPERIMENTAL] Settings saved: WiiM=${loopExperimentalSettings.useWiimNativeLoop}, Client=${loopExperimentalSettings.useClientMonitoring}`);
+      res.json({ success: true, message: 'Loop experimental settings saved' });
+    } else {
+      res.status(500).json({ error: 'Failed to save loop experimental settings' });
+    }
+  } catch (error) {
+    logWithMs(`[LOOP-EXPERIMENTAL ERROR] ${error.message}`);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Остановка на конкретном плеере
 app.post('/api/players/:id/stop', async (req, res) => {
   const { id } = req.params; // Перемещаем наверх, чтобы было доступно в catch
@@ -1263,7 +1236,18 @@ app.post('/api/players/:id/volume', async (req, res) => {
       return res.status(400).json({ error: 'Volume value required' });
     }
 
+    // Отправляем команду на плеер
     const result = await client.setVolume(volume);
+
+    // Сохраняем громкость на сервере
+    storage.updatePlayerVolume(id, volume);
+
+    // Логируем успешную установку громкости
+    const playerData = storage.getPlayers();
+    const player = playerData.players.find(p => p.id === id);
+    const playerName = player ? player.name : id;
+    logWithMs(`[VOLUME] ${playerName} → ${volume}%`);
+
     res.json(result);
   } catch (error) {
     logWithMs(`[VOLUME ERROR] Player ${id}: ${error.message}`);
@@ -1439,11 +1423,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('⚠️  НЕ используйте localhost для управления WiiM плеерами!');
   console.log('   Используйте IP адрес из списка выше.');
   console.log('');
-
-  const activePlayer = storage.getActivePlayer();
-  if (activePlayer) {
-    console.log('Активный плеер: ' + activePlayer.name + ' (' + activePlayer.ip + ')');
-  }
-
   console.log('=================================');
 });

@@ -1783,3 +1783,148 @@ h1 {
     padding-bottom: 8px;
     border-bottom: 2px solid #e5e7eb;
 }
+
+/* ======================================
+   ПРОСТОЙ РЕЖИМ - Упрощенные карточки
+   ====================================== */
+
+.player-control-card.simple-mode {
+    padding: 12px;
+    background: #f9fafb;
+    border-width: 2px;
+}
+
+.player-control-card.simple-mode.playing {
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+
+/* Упрощаем шапку карточки */
+.player-control-card.simple-mode .player-card-header {
+    margin-bottom: 10px;
+}
+
+/* Убираем лишние отступы в простом режиме */
+.player-control-card.simple-mode .player-card-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Упрощаем статус */
+.player-control-card.simple-mode .player-card-status {
+    font-size: 13px;
+    padding: 4px 10px;
+}
+
+/* Компактный селект файлов */
+.player-control-card.simple-mode .player-media-select {
+    margin: 10px 0;
+}
+
+.player-control-card.simple-mode .player-media-select label {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.player-control-card.simple-mode .player-media-select select {
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+/* Компактные кнопки управления */
+.player-control-card.simple-mode .player-card-controls {
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.player-control-card.simple-mode .player-card-controls .btn {
+    padding: 8px 14px;
+    font-size: 13px;
+}
+
+/* Компактный контроль громкости */
+.player-control-card.simple-mode .player-volume-control {
+    margin-top: 10px;
+    gap: 8px;
+}
+
+.player-control-card.simple-mode .player-volume-control .btn {
+    padding: 4px 8px;
+    font-size: 12px;
+    min-width: 30px;
+}
+
+.player-control-card.simple-mode .player-volume-value {
+    font-size: 13px;
+    min-width: 35px;
+}
+
+/* Упрощенная информация о треке */
+.player-control-card.simple-mode .player-card-track {
+    margin: 8px 0;
+    padding: 8px;
+}
+
+.player-control-card.simple-mode .player-track-title {
+    font-size: 14px;
+}
+
+.player-control-card.simple-mode .player-track-artist {
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+/* Прогресс в простом режиме */
+.player-control-card.simple-mode .player-progress {
+    margin: 8px 0;
+    padding: 8px;
+}
+
+.player-control-card.simple-mode .progress-time {
+    font-size: 11px;
+}
+
+/* === Experimental Panel Loop Mode === */
+.experimental-panel {
+    margin: 24px 0;
+    padding: 20px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border: 2px dashed #6c757d;
+    border-radius: 8px;
+}
+
+.experimental-panel h3 {
+    margin: 0 0 12px 0;
+    font-size: 18px;
+    color: #495057;
+}
+
+.experimental-description {
+    margin: 0 0 16px 0;
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.5;
+}
+
+.experimental-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.experimental-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.experimental-option .btn {
+    min-width: 200px;
+    font-weight: 600;
+}
+
+.experimental-label {
+    font-size: 13px;
+    color: #495057;
+    line-height: 1.4;
+}

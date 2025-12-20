@@ -12,6 +12,9 @@
             <header>
                 <h1>WiiM Control Center</h1>
                 <div class="header-controls">
+                    <button id="view-mode-toggle" class="btn btn-secondary" onclick="toggleViewMode()">
+                        <span id="view-mode-icon">🔧</span> <span id="view-mode-text">Простой режим</span>
+                    </button>
                     <button id="enable-demo-btn" class="btn btn-demo" onclick="enableDemoMode(); startDemoAnimation()">🎭 Демо-режим</button>
                     <button id="disable-demo-btn" class="btn btn-demo-exit" onclick="disableDemoMode()" style="display:none">✕ Выйти из демо</button>
                     <div id="connection-status" class="status offline">●</div>

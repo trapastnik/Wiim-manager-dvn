@@ -1,17 +1,15 @@
 // Глобальные переменные
-let currentVolume = 50;
-let isMuted = false;
-let isPlaying = false;
 let messageCounter = 0;
 const MAX_MESSAGES = 50;
 let currentTab = 'player';
-let activePlayerId = null;
 let allPlayers = [];
 let allMediaFiles = [];
 let playerSelections = {}; // Сохраняем выбор файла для каждого плеера
 let playerStatuses = {}; // Статусы всех плееров
 let playerDiagnostics = {}; // Диагностическая информация для каждого плеера
 let playerLoopModes = {}; // Режимы повтора для каждого плеера (0=no loop, 1=single loop)
+let playerVolumes = {}; // Сохраненные громкости для каждого плеера
+let volumeDebounceTimers = {}; // Таймеры debounce для слайдеров громкости
 let serverInfo = null; // Информация о сервере (IP адреса)
 let lastPlayerPositions = {}; // Последние позиции плееров для отслеживания зависаний
 let playerManualStops = {}; // Отслеживание ручных остановок плееров
@@ -19,11 +17,18 @@ let autoRefreshTimer = null; // Таймер для временного авт�
 let autoRefreshCount = 0; // Счетчик автообновлений
 let adaptiveRefreshTimer = null; // Таймер для адаптивного автообновления
 let isAnyPlayerPlaying = false; // Флаг - играет ли хотя бы один плеер
+let playerExpectedStates = {}; // Ожидаемое состояние плеера (play/stop) для отслеживания неожиданных остановок
 let playerGroups = []; // Массив сохранённых групп плееров
 let selectedPlayersForGroup = new Set(); // Временный выбор плееров для создания группы
 let isDemoMode = false; // Демо-режим для тестирования без реальных устройств
 let demoPlayers = []; // Виртуальные плееры для демо-режима
 let demoMediaFiles = []; // Виртуальные медиа файлы для демо-режима
+
+// Экспериментальные настройки Loop Mode (только для Advanced режима)
+let loopExperimentalSettings = {
+    useWiimNativeLoop: true,     // Технология 1: Встроенный WiiM loopMode API
+    useClientMonitoring: false   // Технология 2: Клиентский мониторинг и автоперезапуск
+};
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', async () => {
@@ -44,14 +49,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Failed to get server info:', error);
     }
 
-    loadPlayerSelections();
-    loadLoopModes();
-    loadPlayerGroups();
+    // Загрузка конфигурации с сервера (async)
+    await loadPlayerSelections();
+    await loadLoopModes();
+    await loadVolumes();
+    await loadPlayerGroups();
+    await loadSettings();
+    await loadLoopExperimentalSettings();
+
+    // Загрузка данных плееров и медиа
     loadPlayers();
     loadMedia();
     refreshAllPlayers();
-    // УДАЛЕНО автообновление каждые 3 секунды для снижения нагрузки на Wi-Fi
-    // setInterval(refreshAllPlayers, 3000);
 });
 
 // === СИСТЕМА СООБЩЕНИЙ ===
@@ -119,7 +128,6 @@ async function loadPlayers() {
         const response = await fetch('/api/players');
         const data = await response.json();
 
-        activePlayerId = data.activePlayer;
         allPlayers = data.players || []; // Обновляем глобальную переменную
         renderPlayers(data.players);
         updateSystemInfo(); // Обновляем информацию о системе
@@ -369,131 +377,6 @@ async function cleanupBrokenStates() {
     }
 }
 
-// === УПРАВЛЕНИЕ ПЛЕЕРОМ (сохраняем существующий код) ===
-async function refreshStatus() {
-    try {
-        const response = await fetch('/api/info');
-        const data = await response.json();
-
-        if (data.error) {
-            if (data.error !== 'No active player') {
-                addMessage(`Ошибка от сервера: ${data.error}`, 'error');
-            }
-            updateConnectionStatus(false);
-            return;
-        }
-
-        if (data.status === 200 && data.data) {
-            updateUI(data.data);
-            updateConnectionStatus(true);
-        } else if (response.ok) {
-            addMessage(`Неожиданный формат ответа`, 'warning');
-            updateConnectionStatus(false);
-        } else {
-            updateConnectionStatus(false);
-        }
-    } catch (error) {
-        updateConnectionStatus(false);
-    }
-}
-
-function updateUI(data) {
-    document.getElementById('track-title').textContent = data.Title || '—';
-    document.getElementById('track-artist').textContent = data.Artist || '—';
-
-    const status = data.status || 'stop';
-    document.getElementById('player-state').textContent = status;
-
-    isPlaying = status === 'play';
-    document.getElementById('play-pause').textContent = isPlaying ? '⏸' : '▶';
-
-    if (data.vol !== undefined) {
-        currentVolume = parseInt(data.vol);
-        document.getElementById('volume-slider').value = currentVolume;
-        document.getElementById('volume-value').textContent = currentVolume;
-    }
-
-    if (data.mute !== undefined) {
-        isMuted = data.mute === '1';
-        updateMuteButton();
-    }
-}
-
-function updateConnectionStatus(online) {
-    const status = document.getElementById('connection-status');
-    status.className = online ? 'status online' : 'status offline';
-}
-
-async function control(action) {
-    try {
-        const response = await fetch(`/api/control/${action}`, {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            addMessage(`Команда ${action} выполнена`, 'success');
-            setTimeout(refreshStatus, 500);
-        } else {
-            const error = await response.json();
-            addMessage(`Ошибка: ${error.error}`, 'error');
-        }
-    } catch (error) {
-        addMessage(`Ошибка команды ${action}: ${error.message}`, 'error');
-    }
-}
-
-async function togglePlayPause() {
-    const action = isPlaying ? 'pause' : 'play';
-    await control(action);
-}
-
-async function volumeControl(action) {
-    try {
-        const response = await fetch(`/api/volume/${action}`, {
-            method: 'POST'
-        });
-        if (response.ok) {
-            setTimeout(refreshStatus, 300);
-        }
-    } catch (error) {
-        addMessage(`Ошибка регулировки громкости: ${error.message}`, 'error');
-    }
-}
-
-async function setVolume(value) {
-    try {
-        document.getElementById('volume-value').textContent = value;
-
-        const response = await fetch('/api/volume/set', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ volume: parseInt(value) })
-        });
-    } catch (error) {
-        addMessage(`Ошибка установки громкости: ${error.message}`, 'error');
-    }
-}
-
-async function toggleMute() {
-    try {
-        const action = isMuted ? 'unmute' : 'mute';
-        const response = await fetch(`/api/volume/${action}`, {
-            method: 'POST'
-        });
-        if (response.ok) {
-            isMuted = !isMuted;
-            updateMuteButton();
-            setTimeout(refreshStatus, 300);
-        }
-    } catch (error) {
-        addMessage(`Ошибка mute: ${error.message}`, 'error');
-    }
-}
-
-function updateMuteButton() {
-    document.getElementById('mute-btn').textContent = isMuted ? '🔇' : '🔊';
-}
-
 // === УПРАВЛЕНИЕ МЕДИА ===
 async function loadMedia() {
     try {
@@ -642,25 +525,28 @@ function formatFileSize(bytes) {
 
 // === МУЛЬТИПЛЕЕР УПРАВЛЕНИЕ ===
 
-// Загрузка выборов из localStorage
-function loadPlayerSelections() {
-    const saved = localStorage.getItem('playerSelections');
-    if (saved) {
-        try {
-            playerSelections = JSON.parse(saved);
-        } catch (e) {
-            playerSelections = {};
+// Загрузка выборов с сервера
+async function loadPlayerSelections() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            playerSelections = config.playerSelections || {};
+            console.log('[CONFIG] Player selections loaded from server');
         }
+    } catch (e) {
+        console.error('[CONFIG] Error loading player selections:', e);
+        playerSelections = {};
     }
 }
 
 // Debounce таймер для отложенного сохранения
 let saveSelectionsTimer = null;
 
-// Сохранение выборов в localStorage с debounce (300ms)
+// Сохранение выборов на сервер с debounce (300ms)
 // Это предотвращает частые записи при быстром переключении файлов
 function savePlayerSelections() {
-    // В демо-режиме не сохраняем в localStorage
+    // В демо-режиме не сохраняем на сервер
     if (isDemoMode) return;
 
     // Отменяем предыдущий таймер
@@ -670,8 +556,7 @@ function savePlayerSelections() {
 
     // Устанавливаем новый таймер на 300ms
     saveSelectionsTimer = setTimeout(() => {
-        localStorage.setItem('playerSelections', JSON.stringify(playerSelections));
-        console.log('[STORAGE] Player selections saved (debounced)');
+        console.log('[CONFIG] Player selections saved (debounced)');
 
         // Синхронизируем с сервером для автовосстановления
         syncConfigToServer();
@@ -700,41 +585,74 @@ async function syncConfigToServer() {
     }
 }
 
-// Загрузка режимов повтора из localStorage
-function loadLoopModes() {
-    const saved = localStorage.getItem('playerLoopModes');
-    if (saved) {
-        try {
-            playerLoopModes = JSON.parse(saved);
-        } catch (e) {
-            playerLoopModes = {};
+// Загрузка режимов повтора с сервера
+async function loadLoopModes() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            playerLoopModes = config.playerLoopModes || {};
+            console.log('[CONFIG] Loop modes loaded from server');
         }
+    } catch (e) {
+        console.error('[CONFIG] Error loading loop modes:', e);
+        playerLoopModes = {};
     }
 }
 
-// Сохранение режимов повтора в localStorage
-function saveLoopModes() {
-    localStorage.setItem('playerLoopModes', JSON.stringify(playerLoopModes));
+// Загрузка сохранённых громкостей с сервера
+async function loadVolumes() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            playerVolumes = config.playerVolumes || {};
+            console.log('[CONFIG] Player volumes loaded from server');
+        }
+    } catch (e) {
+        console.error('[CONFIG] Error loading player volumes:', e);
+        playerVolumes = {};
+    }
+}
+
+// Сохранение режимов повтора на сервер
+async function saveLoopModes() {
+    try {
+        const response = await fetch('/api/config/loop-modes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playerLoopModes })
+        });
+
+        if (response.ok) {
+            console.log('[CONFIG] Loop modes saved to server');
+        } else {
+            console.error('[CONFIG] Failed to save loop modes:', await response.text());
+        }
+    } catch (error) {
+        console.error('[CONFIG] Error saving loop modes:', error);
+    }
 }
 
 // === УПРАВЛЕНИЕ ГРУППАМИ ПЛЕЕРОВ ===
 
-// Загрузка групп из localStorage
-function loadPlayerGroups() {
-    const saved = localStorage.getItem('playerGroups');
-    if (saved) {
-        try {
-            playerGroups = JSON.parse(saved);
-        } catch (e) {
-            playerGroups = [];
+// Загрузка групп с сервера
+async function loadPlayerGroups() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            playerGroups = config.playerGroups || [];
+            console.log('[CONFIG] Player groups loaded from server');
         }
+    } catch (e) {
+        console.error('[CONFIG] Error loading player groups:', e);
+        playerGroups = [];
     }
 }
 
-// Сохранение групп в localStorage
+// Сохранение групп на сервер
 function savePlayerGroups() {
-    localStorage.setItem('playerGroups', JSON.stringify(playerGroups));
-
     // Синхронизируем с сервером для автовосстановления
     syncConfigToServer();
 }
@@ -1109,8 +1027,28 @@ async function checkAndRestartIfNeeded(playerId, statusData) {
         alreadyRestarted: lastPos?.alreadyRestarted || false
     };
 
-    // Предиктивный перезапуск УДАЛЁН - теперь используется встроенный режим повтора WiiM (loopmode:1)
-    // WiiM сам бесконечно повторяет трек без дополнительных команд от сервера!
+    // КЛИЕНТСКИЙ МОНИТОРИНГ - автоперезапуск треков (Технология 2)
+    // Активируется только если включён в экспериментальных настройках
+    if (!loopExperimentalSettings.useClientMonitoring) {
+        return; // Выключен - ничего не делаем
+    }
+
+    // Условие 1: Трек закончился нормально (curpos >= totlen)
+    if (playerStatus === 'stop' && totlen > 0 && curpos >= totlen) {
+        console.log(`[LOOP-CLIENT] ${getPlayerName(playerId)}: Трек закончился (${curpos}/${totlen}ms), перезапускаем`);
+        await playPlayer(playerId, true);
+        addMessage(`🔁 ${getPlayerName(playerId)}: перезапуск трека (клиентский мониторинг)`, 'info');
+        return;
+    }
+
+    // Условие 2: Неожиданная остановка (сбой воспроизведения)
+    if (playerStatus === 'stop' && totlen > 0 && curpos < totlen - 1000) {
+        if (lastPos && lastPos.status === 'play') {
+            console.log(`[LOOP-CLIENT] ${getPlayerName(playerId)}: Неожиданная остановка на ${curpos}ms из ${totlen}ms, перезапускаем`);
+            await playPlayer(playerId, true);
+            addMessage(`🔁 ${getPlayerName(playerId)}: перезапуск после сбоя (клиентский мониторинг)`, 'warning');
+        }
+    }
 }
 
 // Проверка и управление адаптивным автообновлением
@@ -1126,7 +1064,7 @@ function checkAndUpdateAdaptiveRefresh() {
 
     if (hasPlayingPlayers && !wasPlaying) {
         // Начинаем адаптивное обновление
-        console.log('[ADAPTIVE] Обнаружены играющие плееры - запуск адаптивного обновления (каждые 3 сек)');
+        console.log('[ADAPTIVE] Обнаружены играющие плееры - запуск адаптивного обновления (каждые 5 сек)');
         startAdaptiveRefresh();
     } else if (!hasPlayingPlayers && wasPlaying) {
         // Останавливаем адаптивное обновление
@@ -1140,11 +1078,11 @@ function startAdaptiveRefresh() {
     if (adaptiveRefreshTimer) return; // Уже запущено
 
     adaptiveRefreshTimer = setInterval(() => {
-        if (currentTab === 'player') {
-            console.log('[ADAPTIVE] Обновление статусов играющих плееров');
-            refreshAllPlayers();
-        }
-    }, 5000); // Каждые 5 секунд (было 3 секунды)
+        console.log('[ADAPTIVE] Обновление статусов играющих плееров (tab:', currentTab, ')');
+        // ВАЖНО: обновляем статусы ВСЕГДА когда что-то играет
+        // UI обновится только если мы на вкладке player
+        refreshAllPlayers();
+    }, 5000); // Каждые 5 секунд
 }
 
 // Остановка адаптивного автообновления
@@ -1187,9 +1125,13 @@ function startTemporaryAutoRefresh(count = 5, interval = 2000) {
 async function refreshAllPlayers() {
     console.log('[REFRESH] Вызвана функция refreshAllPlayers, currentTab:', currentTab);
 
-    if (currentTab !== 'player') {
-        console.log('[REFRESH] Пропускаем обновление - не на вкладке player');
-        return;
+    // ИЗМЕНЕНО: Всегда обновляем статусы, но рендерим UI только на вкладке player
+    const shouldRenderUI = currentTab === 'player';
+
+    if (!shouldRenderUI) {
+        console.log('[REFRESH] Обновляем статусы без рендера UI (не на вкладке player)');
+    } else {
+        console.log('[REFRESH] Полное обновление с рендером UI');
     }
 
     console.log('[REFRESH] Начинаем обновление статусов плееров...');
@@ -1212,11 +1154,47 @@ async function refreshAllPlayers() {
         console.log('All players:', allPlayers.length);
         console.log('All media files:', allMediaFiles.length);
 
+        // УМНАЯ ОПТИМИЗАЦИЯ: Обновляем только нужные плееры
+        // Определяем какие плееры нужно обновить
+        const playersToUpdate = allPlayers.filter(player => {
+            const status = playerStatuses[player.id];
+            const currentState = status?.status || 'stop';
+            const expectedState = playerExpectedStates[player.id] || 'stop';
+            const isPlaying = currentState === 'play';
+
+            // 1. Всегда обновляем играющие плееры (для прогресса)
+            if (isPlaying) return true;
+
+            // 2. ВАЖНО: Плееры которые ДОЛЖНЫ играть, но не играют - проверяем часто (каждые 10 сек)
+            // Это может быть сбой Wi-Fi, отключение питания, ошибка плеера и т.д.
+            if (expectedState === 'play' && currentState !== 'play') {
+                if (!player._lastExpectedCheck) player._lastExpectedCheck = 0;
+                const timeSinceCheck = Date.now() - player._lastExpectedCheck;
+                if (timeSinceCheck > 10000) { // Проверяем каждые 10 секунд
+                    player._lastExpectedCheck = Date.now();
+                    console.log(`[MONITORING] Проверка плеера ${player.name}: ожидается play, сейчас ${currentState}`);
+                    return true;
+                }
+            }
+
+            // 3. Остановленные плееры (которые и должны быть остановлены) - проверяем редко (раз в 30 сек)
+            if (!player._lastFullUpdate) player._lastFullUpdate = 0;
+            const needsFullUpdate = (Date.now() - player._lastFullUpdate) > 30000;
+            if (needsFullUpdate) {
+                player._lastFullUpdate = Date.now();
+                return true;
+            }
+
+            return false;
+        });
+
+        console.log(`[OPTIMIZATION] Обновляем ${playersToUpdate.length} из ${allPlayers.length} плееров (только играющие + периодическая проверка)`);
+
         // ОПТИМИЗАЦИЯ: Батчинг запросов по 3 плеера одновременно для снижения нагрузки на WiFi
         const BATCH_SIZE = 3; // Максимум 3 параллельных запроса
 
-        for (let i = 0; i < allPlayers.length; i += BATCH_SIZE) {
-            const batch = allPlayers.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < playersToUpdate.length; i += BATCH_SIZE) {
+            const batch = playersToUpdate.slice(i, i + BATCH_SIZE);
 
             const batchPromises = batch.map(async (player) => {
                 const startTime = Date.now();
@@ -1229,6 +1207,49 @@ async function refreshAllPlayers() {
                             ...(status.data || {}),
                             _responseTime: responseTime
                         };
+
+                        // 🔄 СИНХРОНИЗАЦИЯ: Обновляем громкость из реального статуса плеера
+                        if (status.data && status.data.vol !== undefined) {
+                            const realVolume = parseInt(status.data.vol);
+                            // Обновляем только если есть реальное значение и оно изменилось
+                            if (!isNaN(realVolume) && playerVolumes[player.id] !== realVolume) {
+                                playerVolumes[player.id] = realVolume;
+                                console.log(`[VOLUME-SYNC] ${player.name}: ${realVolume}% (синхронизировано с плеера)`);
+                            }
+                        }
+
+                        // 🚨 МОНИТОРИНГ: Проверяем неожиданные остановки и автоперезапуск
+                        const currentState = status.data?.status || 'stop';
+                        const expectedState = playerExpectedStates[player.id] || 'stop';
+                        if (expectedState === 'play' && currentState !== 'play') {
+                            console.warn(`[ALERT] ${player.name} НЕОЖИДАННО ОСТАНОВЛЕН! Ожидалось: play, реально: ${currentState}`);
+
+                            // Проверяем: НЕ была ли это ручная остановка
+                            if (!playerManualStops[player.id]) {
+                                // Проверяем: есть ли выбранный файл для перезапуска
+                                const selectedFile = playerSelections[player.id];
+                                if (selectedFile) {
+                                    console.log(`[AUTO-RESTART] Попытка автоматического перезапуска ${player.name}...`);
+                                    addMessage(`🔄 ${player.name} перезапускается автоматически...`, 'info');
+
+                                    // Перезапускаем плеер (без UI обновления, skipRefresh=true)
+                                    playPlayer(player.id, true).then(() => {
+                                        addMessage(`✅ ${player.name} перезапущен успешно`, 'success');
+                                    }).catch(err => {
+                                        addMessage(`❌ Не удалось перезапустить ${player.name}: ${err.message}`, 'error');
+                                        // Если не получилось перезапустить - сбрасываем ожидаемое состояние
+                                        playerExpectedStates[player.id] = 'stop';
+                                    });
+                                } else {
+                                    addMessage(`⚠️ ${player.name} остановлен, но нет файла для перезапуска`, 'warning');
+                                    playerExpectedStates[player.id] = 'stop';
+                                }
+                            } else {
+                                // Это была ручная остановка - не перезапускаем
+                                console.log(`[MANUAL-STOP] ${player.name} - ручная остановка, не перезапускаем`);
+                                playerExpectedStates[player.id] = 'stop';
+                            }
+                        }
 
                         // Проверка на автоматический перезапуск при включенном режиме повтора
                         await checkAndRestartIfNeeded(player.id, status.data);
@@ -1245,17 +1266,27 @@ async function refreshAllPlayers() {
             await Promise.all(batchPromises);
         }
 
-        renderMultiPlayers();
-        renderPlayerGroups(); // Обновляем список групп
-        updateGroupSelectionUI(); // Обновляем UI выбора для групп
-        updateLoopAllButton(); // Обновляем состояние глобальной кнопки
-        updateSystemInfo(); // Обновляем информацию о системе
+        // Рендерим UI только если на вкладке player
+        if (shouldRenderUI) {
+            renderMultiPlayers();
+            renderPlayerGroups(); // Обновляем список групп
+            updateGroupSelectionUI(); // Обновляем UI выбора для групп
+            updateLoopAllButton(); // Обновляем состояние глобальной кнопки
+            updateSystemInfo(); // Обновляем информацию о системе
+        }
 
-        // Проверяем играет ли хотя бы один плеер
+        // Проверяем играет ли хотя бы один плеер (всегда, даже если UI не рендерим)
         checkAndUpdateAdaptiveRefresh();
 
-        console.log('[REFRESH] Обновление завершено успешно. Обновлено плееров:', allPlayers.length);
-        addMessage(`✅ Статусы обновлены (${allPlayers.length} плееров)`, 'success');
+        console.log(`[REFRESH] Обновление завершено успешно. Обновлено ${playersToUpdate.length} из ${allPlayers.length} плееров`);
+        if (shouldRenderUI) {
+            const playingCount = allPlayers.filter(p => playerStatuses[p.id]?.status === 'play').length;
+            if (playingCount > 0) {
+                addMessage(`✅ Статусы обновлены (${playersToUpdate.length}/${allPlayers.length}, играет: ${playingCount})`, 'success');
+            } else {
+                addMessage(`✅ Статусы обновлены (${playersToUpdate.length}/${allPlayers.length})`, 'success');
+            }
+        }
     } catch (error) {
         console.error('[REFRESH] Ошибка обновления плееров:', error);
         addMessage(`Ошибка обновления: ${error.message}`, 'error');
@@ -1270,6 +1301,9 @@ function renderMultiPlayers() {
         container.innerHTML = '<p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>';
         return;
     }
+
+    // Проверяем режим отображения
+    const isSimpleMode = appSettings.viewMode === 'simple';
 
     container.innerHTML = allPlayers.map(player => {
         const status = playerStatuses[player.id] || {};
@@ -1327,6 +1361,76 @@ function renderMultiPlayers() {
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         };
 
+        // ПРОСТОЙ РЕЖИМ - минимум информации
+        if (isSimpleMode) {
+            return `
+                <div class="player-control-card simple-mode ${playerState === 'play' ? 'playing' : 'stopped'}" data-player-id="${player.id}">
+                    <div class="player-card-header">
+                        <div class="player-card-title">
+                            <input type="checkbox" id="group-cb-${player.id}"
+                                   onchange="togglePlayerSelection('${player.id}')"
+                                   class="group-checkbox"
+                                   title="Выбрать для группы">
+                            ${player.name}
+                        </div>
+                        <div class="player-card-status ${playerState}">
+                            ${playerState === 'play' ? '▶ Играет' : '⏹ Остановлен'}
+                        </div>
+                    </div>
+
+                    ${playerState === 'play' && totlen > 0 ? `
+                        <div class="player-progress">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill" style="width: ${progress}%"></div>
+                            </div>
+                            <div class="progress-time">
+                                <span>${formatTime(curpos)}</span>
+                                <span>${formatTime(totlen)}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${hasTrackInfo ? `
+                        <div class="player-card-track">
+                            <div class="player-track-title">${trackTitle}</div>
+                            ${trackArtist ? `<div class="player-track-artist">${trackArtist}</div>` : ''}
+                        </div>
+                    ` : ''}
+
+                    <div class="player-media-select">
+                        <label>Файл:</label>
+                        <select onchange="selectMediaForPlayer('${player.id}', this.value)">
+                            <option value="">— Не выбрано —</option>
+                            ${allMediaFiles.map(file => `
+                                <option value="${file.path}" ${currentFile === file.path ? 'selected' : ''}>
+                                    ${file.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                    </div>
+
+                    <div class="player-card-controls">
+                        <button class="btn btn-success" onclick="playPlayer('${player.id}')" ${!currentFile ? 'disabled' : ''}>
+                            ▶ Играть
+                        </button>
+                        <button class="btn btn-danger" onclick="stopPlayer('${player.id}')">
+                            ⏹ Stop
+                        </button>
+                    </div>
+
+                    <div class="player-volume-control">
+                        <button class="btn btn-small" onclick="adjustVolume('${player.id}', -5)">−</button>
+                        <input type="range" min="0" max="100" value="${volume}"
+                               id="volume-slider-${player.id}"
+                               oninput="setPlayerVolume('${player.id}', this.value)">
+                        <span class="player-volume-value" id="volume-value-${player.id}">${volume}</span>
+                        <button class="btn btn-small" onclick="adjustVolume('${player.id}', 5)">+</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // РАСШИРЕННЫЙ РЕЖИМ - вся информация
         return `
             <div class="player-control-card ${playerState === 'play' ? 'playing' : 'stopped'}" data-player-id="${player.id}">
                 <div class="player-card-header">
@@ -1339,7 +1443,7 @@ function renderMultiPlayers() {
                         <span class="player-ping ${pingClass}">${responseTime}ms</span>
                     </div>
                     <div class="player-card-status ${playerState}">
-                        ${playerState === 'play' ? '▶ Играет' : playerState === 'pause' ? '⏸ Пауза' : '⏹ Остановлен'}
+                        ${playerState === 'play' ? '▶ Играет' : '⏹ Остановлен'}
                     </div>
                 </div>
 
@@ -1349,7 +1453,7 @@ function renderMultiPlayers() {
                     <span class="wifi-signal ${wifiClass}">${rssi} dBm</span>
                 </div>
 
-                ${(playerState === 'play' || playerState === 'pause') && totlen > 0 ? `
+                ${playerState === 'play' && totlen > 0 ? `
                     <div class="player-progress">
                         <div class="progress-bar-container">
                             <div class="progress-bar-fill" style="width: ${progress}%"></div>
@@ -1381,15 +1485,9 @@ function renderMultiPlayers() {
                 </div>
 
                 <div class="player-card-controls">
-                    ${playerState === 'play' ? `
-                        <button class="btn btn-warning" onclick="pausePlayer('${player.id}')">
-                            ⏸ Пауза
-                        </button>
-                    ` : `
-                        <button class="btn btn-success" onclick="playPlayer('${player.id}')" ${!currentFile ? 'disabled' : ''}>
-                            ▶ Играть
-                        </button>
-                    `}
+                    <button class="btn btn-success" onclick="playPlayer('${player.id}')" ${!currentFile ? 'disabled' : ''}>
+                        ▶ Играть
+                    </button>
                     <button class="btn btn-danger" onclick="stopPlayer('${player.id}')">
                         ⏹ Stop
                     </button>
@@ -1403,13 +1501,52 @@ function renderMultiPlayers() {
                 <div class="player-volume-control">
                     <button class="btn btn-small" onclick="adjustVolume('${player.id}', -5)">−</button>
                     <input type="range" min="0" max="100" value="${volume}"
+                           id="volume-slider-${player.id}"
                            oninput="setPlayerVolume('${player.id}', this.value)">
-                    <span class="player-volume-value">${volume}</span>
+                    <span class="player-volume-value" id="volume-value-${player.id}">${volume}</span>
                     <button class="btn btn-small" onclick="adjustVolume('${player.id}', 5)">+</button>
                 </div>
             </div>
         `;
     }).join('');
+
+    // Добавляем экспериментальную панель Loop Mode только в Advanced режиме
+    if (!isSimpleMode) {
+        const experimentalPanel = `
+            <div class="experimental-panel">
+                <h3>🧪 Экспериментальная панель Loop Mode</h3>
+                <p class="experimental-description">
+                    Используйте эти кнопки для тестирования двух разных технологий бесконечного повтора.
+                    Включите один или оба метода чтобы понять какой работает лучше.
+                </p>
+                <div class="experimental-controls">
+                    <div class="experimental-option">
+                        <button
+                            id="toggle-wiim-native-loop"
+                            class="btn ${loopExperimentalSettings.useWiimNativeLoop ? 'btn-success' : 'btn-secondary'}"
+                            onclick="toggleWiimNativeLoop()">
+                            ${loopExperimentalSettings.useWiimNativeLoop ? '✅' : '❌'} WiiM Native Loop
+                        </button>
+                        <span class="experimental-label">
+                            Технология 1: Встроенный WiiM loopMode API (отправляет loopmode:2 на устройство)
+                        </span>
+                    </div>
+                    <div class="experimental-option">
+                        <button
+                            id="toggle-client-monitoring"
+                            class="btn ${loopExperimentalSettings.useClientMonitoring ? 'btn-success' : 'btn-secondary'}"
+                            onclick="toggleClientMonitoring()">
+                            ${loopExperimentalSettings.useClientMonitoring ? '✅' : '❌'} Client Monitoring
+                        </button>
+                        <span class="experimental-label">
+                            Технология 2: Клиентский мониторинг (наша реализация автоперезапуска)
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += experimentalPanel;
+    }
 }
 
 // Получение имени плеера по ID
@@ -1457,6 +1594,68 @@ function updatePlayerPlayButton(playerId, filePath) {
     }
 }
 
+// Мгновенное обновление статуса одного плеера (без запроса к серверу)
+function updatePlayerStatusInstantly(playerId, newStatus) {
+    // Обновляем в playerStatuses
+    if (!playerStatuses[playerId]) {
+        playerStatuses[playerId] = {};
+    }
+    playerStatuses[playerId].status = newStatus;
+
+    console.log(`[INSTANT-UPDATE] Player ${playerId} status updated to: ${newStatus}`);
+
+    // Если на вкладке player - перерисовываем UI
+    if (currentTab === 'player') {
+        renderMultiPlayers();
+    }
+}
+
+// Мгновенное обновление громкости одного плеера (без запроса к серверу)
+function updatePlayerVolumeInstantly(playerId, newVolume) {
+    // Обновляем в playerStatuses
+    if (!playerStatuses[playerId]) {
+        playerStatuses[playerId] = {};
+    }
+    playerStatuses[playerId].vol = newVolume;
+
+    console.log(`[INSTANT-UPDATE] Player ${playerId} volume updated to: ${newVolume}%`);
+
+    // Обновляем слайдер и текст громкости в UI
+    const volumeSlider = document.querySelector(`#volume-slider-${playerId}`);
+    const volumeValue = document.querySelector(`#volume-value-${playerId}`);
+
+    if (volumeSlider) volumeSlider.value = newVolume;
+    if (volumeValue) volumeValue.textContent = newVolume;
+}
+
+// Проверочный запрос статуса одного плеера
+async function verifyPlayerStatus(playerId, delay = 1000) {
+    setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/players/${playerId}/status`);
+            if (response.ok) {
+                const status = await response.json();
+                playerStatuses[playerId] = {
+                    ...(status.data || {}),
+                    _responseTime: 0
+                };
+
+                console.log(`[VERIFY] Player ${playerId} actual status: ${status.data?.status}`);
+
+                // Обновляем UI если на вкладке
+                if (currentTab === 'player') {
+                    renderMultiPlayers();
+                }
+
+                // Проверяем адаптивное обновление
+                checkAndUpdateAdaptiveRefresh();
+            }
+        } catch (error) {
+            console.error(`[VERIFY] Error checking player ${playerId}:`, error);
+        }
+    }, delay);
+}
+
 // Воспроизведение на одном плеере
 async function playPlayer(playerId, skipRefresh = false, startTime = null, groupId = null) {
     const t0 = startTime || performance.now();
@@ -1489,6 +1688,10 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null, group
         delete playerManualStops[playerId];
         console.log(`[PLAY] Сброс флага ручной остановки для: ${getPlayerName(playerId)}`);
 
+        // Устанавливаем ожидаемое состояние - плеер должен играть
+        playerExpectedStates[playerId] = 'play';
+        console.log(`[EXPECTED] ${getPlayerName(playerId)} → ожидается play`);
+
         // Сохраняем информацию о команде
         playerDiagnostics[playerId] = {
             lastCommand: 'play',
@@ -1501,9 +1704,14 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null, group
         const t1 = performance.now();
         console.log(`[PLAY ${t1.toFixed(3)}ms] ${playerName} [${playerId}]: Sending fetch request (offset: ${(t1-t0).toFixed(3)}ms)`);
 
-        // ВСЕГДА используем loopMode=2 (repeat all) для бесконечного повтора трека
-        // Это единственный способ заставить WiiM повторять одиночный файл через play:URL
-        const loopMode = 2;
+        // ТЕХНОЛОГИЯ 1: Встроенный WiiM loopMode API
+        // Отправляем loopMode:2 только если включена соответствующая настройка
+        const loopMode = loopExperimentalSettings.useWiimNativeLoop ? 2 : 0;
+
+        // Сохраняем режим повтора в глобальном состоянии
+        playerLoopModes[playerId] = loopMode;
+        saveLoopModes(); // Сохраняем на сервер
+        console.log(`[LOOP-WIIM] ${getPlayerName(playerId)} → loopMode ${loopMode} (Native: ${loopExperimentalSettings.useWiimNativeLoop})`);
 
         const response = await fetch(`/api/players/${playerId}/play`, {
             method: 'POST',
@@ -1542,7 +1750,15 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null, group
 
             // Обновляем статусы только при индивидуальном запуске
             if (!skipRefresh) {
-                startTemporaryAutoRefresh(2, 3000); // 2 обновления каждые 3 секунды (было 5×2с)
+                // ⚡ МГНОВЕННОЕ ОБНОВЛЕНИЕ: Сразу меняем статус на "play"
+                updatePlayerStatusInstantly(playerId, 'play');
+
+                // 🔍 ПРОВЕРКА: Запрашиваем реальный статус через 1 сек
+                verifyPlayerStatus(playerId, 1000);
+
+                // 🔄 АДАПТИВНОЕ ОБНОВЛЕНИЕ: Запускаем периодическое обновление
+                isAnyPlayerPlaying = true;
+                startAdaptiveRefresh();
             }
         } else {
             addMessage(`Ошибка: ${result.error}`, 'error');
@@ -1554,22 +1770,6 @@ async function playPlayer(playerId, skipRefresh = false, startTime = null, group
         addMessage(`Ошибка воспроизведения: ${error.message}`, 'error');
 
         playerDiagnostics[playerId].lastError = error.message;
-    }
-}
-
-// Пауза на одном плеере
-async function pausePlayer(playerId) {
-    try {
-        const response = await fetch(`/api/players/${playerId}/pause`, {
-            method: 'POST'
-        });
-
-        if (response.ok) {
-            addMessage(`⏸ Пауза: ${getPlayerName(playerId)}`, 'success');
-            startTemporaryAutoRefresh(1, 3000); // 1 обновление через 3 секунды (было 3×2с)
-        }
-    } catch (error) {
-        addMessage(`Ошибка паузы: ${error.message}`, 'error');
     }
 }
 
@@ -1617,32 +1817,60 @@ async function stopPlayer(playerId) {
         playerManualStops[playerId] = true;
         console.log(`[STOP] Ручная остановка плеера: ${getPlayerName(playerId)}`);
 
+        // Устанавливаем ожидаемое состояние - плеер должен быть остановлен
+        playerExpectedStates[playerId] = 'stop';
+        console.log(`[EXPECTED] ${getPlayerName(playerId)} → ожидается stop`);
+
         const response = await fetch(`/api/players/${playerId}/stop`, {
             method: 'POST'
         });
 
         if (response.ok) {
             addMessage(`⏹ Остановка: ${getPlayerName(playerId)}`, 'success');
-            startTemporaryAutoRefresh(1, 3000); // 1 обновление через 3 секунды (было 3×2с)
+
+            // ⚡ МГНОВЕННОЕ ОБНОВЛЕНИЕ: Сразу меняем статус на "stop"
+            updatePlayerStatusInstantly(playerId, 'stop');
+
+            // 🔍 ПРОВЕРКА: Запрашиваем реальный статус через 1 сек
+            verifyPlayerStatus(playerId, 1000);
         }
     } catch (error) {
         addMessage(`Ошибка остановки: ${error.message}`, 'error');
     }
 }
 
-// Установка громкости
+// Установка громкости с debounce
 async function setPlayerVolume(playerId, volume) {
-    try {
-        await fetch(`/api/players/${playerId}/volume`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ volume: parseInt(volume) })
-        });
-        // Для громкости не нужно много обновлений
-        refreshAllPlayers();
-    } catch (error) {
-        console.error('Ошибка установки громкости:', error);
+    const volumeInt = parseInt(volume);
+
+    // ⚡ МГНОВЕННОЕ ОБНОВЛЕНИЕ UI: Сразу меняем отображаемую громкость
+    updatePlayerVolumeInstantly(playerId, volumeInt);
+
+    // 🕐 DEBOUNCE: Отменяем предыдущий таймер для этого плеера
+    if (volumeDebounceTimers[playerId]) {
+        clearTimeout(volumeDebounceTimers[playerId]);
     }
+
+    // 🕐 DEBOUNCE: Отправляем команду только через 300ms после последнего изменения
+    volumeDebounceTimers[playerId] = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/players/${playerId}/volume`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ volume: volumeInt })
+            });
+
+            if (response.ok) {
+                // Сохраняем громкость в глобальной переменной
+                playerVolumes[playerId] = volumeInt;
+                addMessage(`🔊 Громкость ${getPlayerName(playerId)}: ${volumeInt}%`, 'info');
+            } else {
+                addMessage(`Ошибка установки громкости: ${getPlayerName(playerId)}`, 'error');
+            }
+        } catch (error) {
+            addMessage(`Ошибка громкости: ${error.message}`, 'error');
+        }
+    }, 300); // Debounce 300ms
 }
 
 // Регулировка громкости
@@ -1669,7 +1897,7 @@ async function toggleLoopMode(playerId) {
 
         if (response.ok) {
             playerLoopModes[playerId] = newMode;
-            saveLoopModes(); // Сохраняем состояние в localStorage
+            saveLoopModes(); // Сохраняем состояние на сервер
             updateLoopButton(playerId, newMode);
             updateLoopAllButton(); // Обновляем глобальную кнопку
 
@@ -1859,7 +2087,7 @@ async function toggleLoopModeAll() {
         const elapsed = Date.now() - startTime;
         const successCount = results.filter(r => r.success).length;
 
-        // Сохраняем изменения в localStorage
+        // Сохраняем изменения на сервер
         saveLoopModes();
 
         // Обновляем глобальную кнопку
@@ -1887,6 +2115,61 @@ function updateLoopAllButton() {
         btn.textContent = '🔁 Режим повтора: ВЫКЛ (все)';
         btn.classList.remove('btn-loop-active');
         btn.classList.add('btn-secondary');
+    }
+}
+
+// === ЭКСПЕРИМЕНТАЛЬНЫЕ ФУНКЦИИ LOOP MODE ===
+
+// Переключение встроенного WiiM Native Loop
+async function toggleWiimNativeLoop() {
+    loopExperimentalSettings.useWiimNativeLoop = !loopExperimentalSettings.useWiimNativeLoop;
+
+    // Сохраняем настройки на сервер
+    await saveLoopExperimentalSettings();
+
+    // Перерисовываем интерфейс
+    if (currentTab === 'player') {
+        renderMultiPlayers();
+    }
+
+    const status = loopExperimentalSettings.useWiimNativeLoop ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН';
+    addMessage(`🧪 WiiM Native Loop ${status}`, 'info');
+    console.log(`[EXPERIMENT] WiiM Native Loop: ${loopExperimentalSettings.useWiimNativeLoop}`);
+}
+
+// Переключение клиентского мониторинга
+async function toggleClientMonitoring() {
+    loopExperimentalSettings.useClientMonitoring = !loopExperimentalSettings.useClientMonitoring;
+
+    // Сохраняем настройки на сервер
+    await saveLoopExperimentalSettings();
+
+    // Перерисовываем интерфейс
+    if (currentTab === 'player') {
+        renderMultiPlayers();
+    }
+
+    const status = loopExperimentalSettings.useClientMonitoring ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН';
+    addMessage(`🧪 Client Monitoring ${status}`, 'info');
+    console.log(`[EXPERIMENT] Client Monitoring: ${loopExperimentalSettings.useClientMonitoring}`);
+}
+
+// Сохранение экспериментальных настроек loop mode на сервер
+async function saveLoopExperimentalSettings() {
+    try {
+        const response = await fetch('/api/config/loop-experimental', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loopExperimentalSettings })
+        });
+
+        if (response.ok) {
+            console.log('[CONFIG] Loop experimental settings saved to server');
+        } else {
+            console.error('[CONFIG] Failed to save loop experimental settings:', await response.text());
+        }
+    } catch (error) {
+        console.error('[CONFIG] Error saving loop experimental settings:', error);
     }
 }
 
@@ -2222,9 +2505,6 @@ async function refreshIndependentStatus() {
             if (playerState === 'play') {
                 stateClass = 'playing';
                 stateText = '▶ Играет';
-            } else if (playerState === 'pause') {
-                stateClass = 'paused';
-                stateText = '⏸ Пауза';
             }
 
             let pingClass = 'good';
@@ -2319,11 +2599,15 @@ window.addEventListener('load', () => {
     let startX = 0;
     let startWidth = 0;
     
-    // Загрузка сохраненной ширины
-    const savedWidth = localStorage.getItem('messagesPanelWidth');
-    if (savedWidth) {
-        panel.style.width = savedWidth + 'px';
-    }
+    // Загрузка сохраненной ширины с сервера
+    fetch('/api/config')
+        .then(response => response.json())
+        .then(config => {
+            if (config.messagesPanelWidth) {
+                panel.style.width = config.messagesPanelWidth + 'px';
+            }
+        })
+        .catch(e => console.error('[CONFIG] Error loading panel width:', e));
     
     handle.addEventListener('mousedown', (e) => {
         isResizing = true;
@@ -2351,9 +2635,13 @@ window.addEventListener('load', () => {
             isResizing = false;
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
-            
-            // Сохранение ширины
-            localStorage.setItem('messagesPanelWidth', panel.offsetWidth);
+
+            // Сохранение ширины на сервер
+            fetch('/api/config/panel-width', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ width: panel.offsetWidth })
+            }).catch(e => console.error('[CONFIG] Error saving panel width:', e));
         }
     });
 })();
@@ -2362,20 +2650,44 @@ window.addEventListener('load', () => {
 
 // Глобальные переменные настроек с значениями по умолчанию
 let appSettings = {
-    beepSoundUrl: 'default'     // URL звука для пищалки (default = Google TTS)
+    beepSoundUrl: 'default',    // URL звука для пищалки (default = Google TTS)
+    viewMode: 'advanced'         // Режим отображения: 'simple' или 'advanced'
 };
 
-// Загрузка настроек из localStorage
-function loadSettings() {
-    const saved = localStorage.getItem('appSettings');
-    if (saved) {
-        try {
-            appSettings = JSON.parse(saved);
-        } catch (e) {
-            console.error('Ошибка загрузки настроек:', e);
+// Загрузка настроек с сервера
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            appSettings = config.appSettings || { beepSoundUrl: 'default', viewMode: 'advanced' };
+            // Обеспечиваем наличие viewMode с дефолтным значением
+            if (!appSettings.viewMode) {
+                appSettings.viewMode = 'advanced';
+            }
+            console.log('[CONFIG] App settings loaded from server');
         }
+    } catch (e) {
+        console.error('[CONFIG] Error loading app settings:', e);
+        appSettings = { beepSoundUrl: 'default', viewMode: 'advanced' };
     }
     updateSettingsUI();
+}
+
+// Загрузка экспериментальных настроек loop mode
+async function loadLoopExperimentalSettings() {
+    try {
+        const response = await fetch('/api/config');
+        if (response.ok) {
+            const config = await response.json();
+            if (config.loopExperimentalSettings) {
+                loopExperimentalSettings = config.loopExperimentalSettings;
+                console.log('[CONFIG] Loop experimental settings loaded from server');
+            }
+        }
+    } catch (e) {
+        console.error('[CONFIG] Error loading loop experimental settings:', e);
+    }
 }
 
 // Обновление UI настроек
@@ -2386,6 +2698,9 @@ function updateSettingsUI() {
         beepSoundSelect.value = appSettings.beepSoundUrl || 'default';
     }
 
+    // Обновляем кнопку переключения режима
+    updateViewModeButton();
+
     // Обновляем счетчики в секции информации
     const playersCount = document.getElementById('info-players-count');
     const mediaCount = document.getElementById('info-media-count');
@@ -2395,22 +2710,35 @@ function updateSettingsUI() {
 }
 
 // Сохранение настроек
-function saveSettings() {
+async function saveSettings() {
     const beepSoundSelect = document.getElementById('beep-sound-select');
     const beepSoundUrl = beepSoundSelect ? beepSoundSelect.value : 'default';
 
     // Сохранение
     appSettings.beepSoundUrl = beepSoundUrl;
 
-    localStorage.setItem('appSettings', JSON.stringify(appSettings));
-    updateSettingsUI();
+    try {
+        const response = await fetch('/api/config/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSettings })
+        });
 
-    addMessage('✅ Настройки сохранены успешно', 'success');
-    console.log('[SETTINGS] Новые настройки:', appSettings);
+        if (response.ok) {
+            updateSettingsUI();
+            addMessage('✅ Настройки сохранены успешно', 'success');
+            console.log('[SETTINGS] Новые настройки:', appSettings);
+        } else {
+            addMessage('❌ Ошибка сохранения настроек', 'error');
+        }
+    } catch (error) {
+        addMessage('❌ Ошибка сохранения настроек', 'error');
+        console.error('[SETTINGS] Error saving settings:', error);
+    }
 }
 
 // Сброс настроек к значениям по умолчанию
-function resetSettings() {
+async function resetSettings() {
     if (!confirm('Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?')) {
         return;
     }
@@ -2419,11 +2747,72 @@ function resetSettings() {
         beepSoundUrl: 'default'
     };
 
-    localStorage.setItem('appSettings', JSON.stringify(appSettings));
-    updateSettingsUI();
+    try {
+        const response = await fetch('/api/config/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSettings })
+        });
 
-    addMessage('🔄 Настройки сброшены к значениям по умолчанию', 'info');
-    console.log('[SETTINGS] Сброс к значениям по умолчанию');
+        if (response.ok) {
+            updateSettingsUI();
+            addMessage('🔄 Настройки сброшены к значениям по умолчанию', 'info');
+            console.log('[SETTINGS] Сброс к значениям по умолчанию');
+        } else {
+            addMessage('❌ Ошибка сброса настроек', 'error');
+        }
+    } catch (error) {
+        addMessage('❌ Ошибка сброса настроек', 'error');
+        console.error('[SETTINGS] Error resetting settings:', error);
+    }
+}
+
+// Переключение режима отображения (простой/расширенный)
+async function toggleViewMode() {
+    // Переключаем режим
+    const newMode = appSettings.viewMode === 'simple' ? 'advanced' : 'simple';
+    appSettings.viewMode = newMode;
+
+    // Обновляем кнопку
+    updateViewModeButton();
+
+    // Сохраняем на сервер
+    try {
+        const response = await fetch('/api/config/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ appSettings })
+        });
+
+        if (response.ok) {
+            console.log(`[VIEW-MODE] Режим переключен: ${newMode}`);
+            addMessage(`${newMode === 'simple' ? '📱 Простой режим' : '🔧 Расширенный режим'} активирован`, 'info');
+
+            // Перерисовываем интерфейс если мы на вкладке плеера
+            if (currentTab === 'player') {
+                renderMultiPlayers();
+            }
+        } else {
+            addMessage('❌ Ошибка сохранения режима', 'error');
+        }
+    } catch (error) {
+        console.error('[VIEW-MODE] Error saving view mode:', error);
+        addMessage('❌ Ошибка сохранения режима', 'error');
+    }
+}
+
+// Обновление кнопки переключения режима
+function updateViewModeButton() {
+    const iconEl = document.getElementById('view-mode-icon');
+    const textEl = document.getElementById('view-mode-text');
+
+    if (appSettings.viewMode === 'simple') {
+        if (iconEl) iconEl.textContent = '🔧';
+        if (textEl) textEl.textContent = 'Расширенный режим';
+    } else {
+        if (iconEl) iconEl.textContent = '📱';
+        if (textEl) textEl.textContent = 'Простой режим';
+    }
 }
 
 // Функция обновления информации о системе

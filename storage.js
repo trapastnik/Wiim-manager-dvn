@@ -11,6 +11,7 @@ class Storage {
     this.playersFile = join(this.dataDir, 'players.json');
     this.mediaFile = join(this.dataDir, 'media.json');
     this.playbackStateFile = join(this.dataDir, 'playback-state.json');
+    this.uiConfigFile = join(this.dataDir, 'ui-config.json');
 
     // Очистка старых временных файлов при инициализации
     this.cleanupTempFiles();
@@ -49,13 +50,13 @@ class Storage {
   getPlayers() {
     try {
       if (!existsSync(this.playersFile)) {
-        return { players: [], activePlayer: null };
+        return { players: [] };
       }
       const data = readFileSync(this.playersFile, 'utf-8');
       return JSON.parse(data);
     } catch (error) {
       console.error('Error reading players:', error);
-      return { players: [], activePlayer: null };
+      return { players: [] };
     }
   }
 
@@ -128,11 +129,6 @@ class Storage {
       console.log(`[STORAGE] New player added: "${player.name}" at ${player.ip}`);
     }
 
-    // Если это первый плеер, делаем его активным
-    if (!data.activePlayer && data.players.length > 0) {
-      data.activePlayer = data.players[0].id;
-    }
-
     return this.savePlayers(data);
   }
 
@@ -140,33 +136,9 @@ class Storage {
   removePlayer(playerId) {
     const data = this.getPlayers();
     data.players = data.players.filter(p => p.id !== playerId);
-
-    // Если удалили активный, выбираем первый
-    if (data.activePlayer === playerId) {
-      data.activePlayer = data.players.length > 0 ? data.players[0].id : null;
-    }
-
     return this.savePlayers(data);
   }
 
-  // Установка активного плеера
-  setActivePlayer(playerId) {
-    const data = this.getPlayers();
-    const player = data.players.find(p => p.id === playerId);
-
-    if (player) {
-      data.activePlayer = playerId;
-      return this.savePlayers(data);
-    }
-    return false;
-  }
-
-  // Получение активного плеера
-  getActivePlayer() {
-    const data = this.getPlayers();
-    if (!data.activePlayer) return null;
-    return data.players.find(p => p.id === data.activePlayer);
-  }
 
   // Работа с медиа файлами
   getMedia() {
@@ -349,6 +321,103 @@ class Storage {
       console.error('[CLEANUP] Error cleaning playback state:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // ================================================
+  // МЕТОДЫ ДЛЯ UI КОНФИГУРАЦИИ (loopModes, settings)
+  // ================================================
+
+  // Получить UI конфигурацию (loopModes, appSettings, messagesPanelWidth)
+  getUIConfig() {
+    try {
+      if (!existsSync(this.uiConfigFile)) {
+        return {
+          playerLoopModes: {},
+          appSettings: { beepSoundUrl: 'default' },
+          messagesPanelWidth: null,
+          lastUpdated: null
+        };
+      }
+      const data = readFileSync(this.uiConfigFile, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      console.error('[STORAGE] Error reading UI config:', error);
+      return {
+        playerLoopModes: {},
+        playerVolumes: {},
+        appSettings: { beepSoundUrl: 'default' },
+        messagesPanelWidth: null,
+        lastUpdated: null
+      };
+    }
+  }
+
+  // Сохранить UI конфигурацию (атомарно)
+  saveUIConfig(config) {
+    try {
+      const fullConfig = {
+        playerLoopModes: config.playerLoopModes || {},
+        playerVolumes: config.playerVolumes || {},
+        appSettings: config.appSettings || { beepSoundUrl: 'default' },
+        messagesPanelWidth: config.messagesPanelWidth || null,
+        lastUpdated: new Date().toISOString()
+      };
+
+      // Записываем во временный файл
+      const tempFile = this.uiConfigFile + '.tmp';
+      writeFileSync(tempFile, JSON.stringify(fullConfig, null, 2));
+
+      // Атомарная замена
+      renameSync(tempFile, this.uiConfigFile);
+      return true;
+    } catch (error) {
+      console.error('[STORAGE] Error saving UI config:', error);
+      return false;
+    }
+  }
+
+  // Обновить только loopModes
+  updateLoopModes(playerLoopModes) {
+    const config = this.getUIConfig();
+    config.playerLoopModes = playerLoopModes;
+    return this.saveUIConfig(config);
+  }
+
+  // Обновить только appSettings
+  updateAppSettings(appSettings) {
+    const config = this.getUIConfig();
+    config.appSettings = appSettings;
+    return this.saveUIConfig(config);
+  }
+
+  // Обновить ширину панели сообщений
+  updateMessagesPanelWidth(width) {
+    const config = this.getUIConfig();
+    config.messagesPanelWidth = width;
+    return this.saveUIConfig(config);
+  }
+
+  // Обновить громкость для конкретного плеера
+  updatePlayerVolume(playerId, volume) {
+    const config = this.getUIConfig();
+    if (!config.playerVolumes) config.playerVolumes = {};
+    config.playerVolumes[playerId] = parseInt(volume);
+    return this.saveUIConfig(config);
+  }
+
+  // Получить сохраненную громкость плеера
+  getPlayerVolume(playerId) {
+    const config = this.getUIConfig();
+    return config.playerVolumes && config.playerVolumes[playerId] !== undefined
+      ? config.playerVolumes[playerId]
+      : null; // null означает "использовать текущую громкость плеера"
+  }
+
+  // Обновить экспериментальные настройки loop mode
+  updateLoopExperimentalSettings(loopExperimentalSettings) {
+    const config = this.getUIConfig();
+    config.loopExperimentalSettings = loopExperimentalSettings;
+    return this.saveUIConfig(config);
   }
 }
 
