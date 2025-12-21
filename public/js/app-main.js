@@ -12,6 +12,7 @@ import { appState } from './state/AppState.js';
 import { addMessage, clearMessages } from './ui/messages.js';
 import { switchTab } from './ui/tabs.js';
 import * as PlayersUI from './ui/players-ui.js';
+import * as MultiPlayersUI from './ui/multi-players-ui.js';
 import * as MediaUI from './ui/media-ui.js';
 import * as GroupsUI from './ui/groups-ui.js';
 
@@ -44,6 +45,7 @@ window.switchTab = switchTab;
 // UI - Players
 window.loadPlayers = PlayersUI.loadPlayers;
 window.renderPlayers = PlayersUI.renderPlayers;
+window.renderMultiPlayers = MultiPlayersUI.renderMultiPlayers;
 window.scanPlayers = PlayersUI.scanPlayers;
 window.closeScanModal = PlayersUI.closeScanModal;
 window.showAddPlayer = PlayersUI.showAddPlayer;

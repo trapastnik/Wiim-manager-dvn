@@ -1,6 +1,7 @@
 import { appState } from '../state/AppState.js';
 import { addMessage } from '../ui/messages.js';
 import { renderPlayers } from '../ui/players-ui.js';
+import { renderMultiPlayers } from '../ui/multi-players-ui.js';
 import { renderMedia } from '../ui/media-ui.js';
 import { renderPlayerGroups } from '../ui/groups-ui.js';
 
@@ -90,8 +91,8 @@ export function enableDemoMode() {
   renderMedia(demoMediaFiles);
   renderPlayerGroups();
 
-  // Рендерим плееры на главной вкладке (временное решение)
-  renderMultiPlayersList(demoPlayers);
+  // Рендерим плееры на главной вкладке
+  renderMultiPlayers();
 
   // Обновляем заголовок
   const header = document.querySelector('header h1');
@@ -240,116 +241,4 @@ function updatePlayerProgress(playerId, status) {
     progressTimes[0].textContent = formatTime(curpos);
     progressTimes[1].textContent = formatTime(totlen);
   }
-}
-
-/**
- * Рендерить плееры на главной вкладке (multi-players-list)
- * ВРЕМЕННОЕ РЕШЕНИЕ: полная функция renderMultiPlayers будет восстановлена позже
- */
-function renderMultiPlayersList(players) {
-  const container = document.getElementById('multi-players-list');
-  if (!container) return;
-
-  if (!players || players.length === 0) {
-    container.innerHTML = '<p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>';
-    return;
-  }
-
-  container.innerHTML = players.map(player => {
-    const status = appState.getPlayerStatus(player.id) || {};
-    const playerState = status.status || 'stop';
-    const volume = status.vol !== undefined ? parseInt(status.vol) : 50;
-    const trackTitle = status.Title || '';
-    const trackArtist = status.Artist || '';
-    const currentFile = appState.getPlayerSelection(player.id) || '';
-
-    // Данные о прогрессе
-    const curpos = parseInt(status.curpos) || 0;
-    const totlen = parseInt(status.totlen) || 0;
-    const progress = totlen > 0 ? (curpos / totlen) * 100 : 0;
-
-    const formatTime = (ms) => {
-      const seconds = Math.floor(ms / 1000);
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const formatFileSize = (bytes) => {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    };
-
-    const hasTrackInfo = trackTitle && trackTitle !== 'Unknown' && !trackTitle.startsWith('http');
-
-    return `
-      <div class="player-control-card ${playerState === 'play' ? 'playing' : 'stopped'}" data-player-id="${player.id}">
-        <div class="player-card-header">
-          <div class="player-card-title">
-            <input type="checkbox" id="group-cb-${player.id}"
-                   onchange="togglePlayerSelection('${player.id}')"
-                   class="group-checkbox"
-                   title="Выбрать для группы">
-            ${player.name}
-          </div>
-          <div class="player-card-status ${playerState}">
-            ${playerState === 'play' ? '▶ Играет' : '⏹ Остановлен'}
-          </div>
-        </div>
-
-        ${playerState === 'play' && totlen > 0 ? `
-          <div class="player-progress">
-            <div class="progress-bar-container">
-              <div class="progress-bar-fill" style="width: ${progress}%"></div>
-            </div>
-            <div class="progress-time">
-              <span>${formatTime(curpos)}</span>
-              <span>${formatTime(totlen)}</span>
-            </div>
-          </div>
-        ` : ''}
-
-        ${hasTrackInfo ? `
-          <div class="player-card-track">
-            <div class="player-track-title">${trackTitle}</div>
-            ${trackArtist ? `<div class="player-track-artist">${trackArtist}</div>` : ''}
-          </div>
-        ` : ''}
-
-        <div class="player-media-select">
-          <label>Выберите файл для воспроизведения:</label>
-          <select onchange="window.selectMediaForPlayer('${player.id}', this.value)">
-            <option value="">— Не выбрано —</option>
-            ${appState.mediaFiles.map(file => `
-              <option value="${file.path}" ${currentFile === file.path ? 'selected' : ''}>
-                ${file.name} (${formatFileSize(file.size)})
-              </option>
-            `).join('')}
-          </select>
-        </div>
-
-        <div class="player-card-controls">
-          <button class="btn btn-success" onclick="window.playPlayer('${player.id}')" ${!currentFile ? 'disabled' : ''}>
-            ▶ Играть
-          </button>
-          <button class="btn btn-danger" onclick="window.stopPlayer('${player.id}')">
-            ⏹ Stop
-          </button>
-          <button class="btn btn-info btn-small" onclick="window.playBeep('${player.id}')" title="Воспроизвести звуковой сигнал для идентификации плеера">
-            🔔 Пищалка
-          </button>
-        </div>
-
-        <div class="player-volume-control">
-          <button class="btn btn-small" onclick="window.adjustVolume('${player.id}', -5)">−</button>
-          <input type="range" min="0" max="100" value="${volume}"
-                 id="volume-slider-${player.id}"
-                 oninput="window.setPlayerVolume('${player.id}', this.value)">
-          <span class="player-volume-value" id="volume-value-${player.id}">${volume}</span>
-          <button class="btn btn-small" onclick="window.adjustVolume('${player.id}', 5)">+</button>
-        </div>
-      </div>
-    `;
-  }).join('');
 }
