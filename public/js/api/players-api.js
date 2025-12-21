@@ -15,10 +15,10 @@ export async function getPlayers() {
 /**
  * Сканировать сеть для поиска плееров
  * @param {string} subnet - подсеть для сканирования (опционально)
- * @returns {Promise<{found: number, devices: Array, subnet: string}>}
+ * @returns {Promise<Array>}
  */
 export async function scanPlayers(subnet = null) {
-  return await post('/api/players/scan', subnet ? { subnet } : {});
+  return await post('/api/scanner/scan', subnet ? { subnet } : {});
 }
 
 /**
