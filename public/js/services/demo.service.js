@@ -64,7 +64,11 @@ function createDemoData() {
  * Включить демо-режим
  */
 export function enableDemoMode() {
+  console.log('[DEMO] enableDemoMode() вызвана!');
+
   const { demoPlayers, demoMediaFiles, playerStatuses, playerSelections } = createDemoData();
+  console.log('[DEMO] Создано плееров:', demoPlayers.length);
+  console.log('[DEMO] Создано медиа:', demoMediaFiles.length);
 
   // Устанавливаем демо-режим в AppState
   appState.enableDemoMode();
