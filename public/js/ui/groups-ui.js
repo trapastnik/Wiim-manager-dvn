@@ -6,6 +6,7 @@ import { appState } from '../state/AppState.js';
 import { addMessage } from './messages.js';
 import { getElement, setHTML } from '../utils/dom.js';
 import * as ConfigSync from '../services/config-sync.service.js';
+import * as PlayerService from '../services/player-service.js';
 
 /**
  * Переключить выбор плеера для группы
@@ -100,6 +101,54 @@ export function deletePlayerGroup(groupId) {
   addMessage('Группа удалена', 'success');
   renderPlayerGroups();
   ConfigSync.savePlayerGroups();
+}
+
+/**
+ * Воспроизвести группу плееров синхронно
+ * @param {string} groupId - ID группы
+ */
+export async function playGroup(groupId) {
+  const groups = appState.getPlayerGroups();
+  const group = groups.find(g => g.id === groupId);
+
+  if (!group) {
+    addMessage('Группа не найдена', 'error');
+    return;
+  }
+
+  // Проверяем какие плееры имеют выбранные файлы
+  const playersWithFiles = group.players.filter(playerId =>
+    appState.getPlayerSelection(playerId)
+  );
+
+  if (playersWithFiles.length === 0) {
+    addMessage(`В группе "${group.name}" нет плееров с выбранными файлами`, 'warning');
+    return;
+  }
+
+  addMessage(`Синхронный запуск группы "${group.name}" (${playersWithFiles.length} плееров)...`, 'info');
+
+  try {
+    // Запускаем все плееры группы параллельно
+    await Promise.all(
+      playersWithFiles.map(async playerId => {
+        const fileUrl = appState.getPlayerSelection(playerId);
+        const loopMode = appState.getPlayerLoopMode(playerId) || 2;
+
+        // Устанавливаем loop mode
+        await window.PlayersAPI.setLoopMode(playerId, loopMode);
+        // Запускаем воспроизведение
+        return window.PlayersAPI.playMedia(playerId, fileUrl);
+      })
+    );
+
+    addMessage(`✓ Группа "${group.name}" запущена`, 'success');
+
+    // Обновляем статусы всех плееров
+    await PlayerService.refreshAllPlayers();
+  } catch (error) {
+    addMessage(`Ошибка запуска группы: ${error.message}`, 'error');
+  }
 }
 
 /**

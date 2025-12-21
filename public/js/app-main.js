@@ -70,6 +70,7 @@ window.updateGroupSelectionUI = GroupsUI.updateGroupSelectionUI;
 window.createPlayerGroup = GroupsUI.createPlayerGroup;
 window.clearPlayerSelection = GroupsUI.clearPlayerSelection;
 window.deletePlayerGroup = GroupsUI.deletePlayerGroup;
+window.playGroup = GroupsUI.playGroup;
 window.renderPlayerGroups = GroupsUI.renderPlayerGroups;
 window.loadPlayerGroups = GroupsUI.loadPlayerGroups;
 
