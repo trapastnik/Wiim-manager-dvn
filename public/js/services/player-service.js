@@ -152,18 +152,32 @@ export async function setLoopMode(playerId, mode) {
  * @param {string} playerId - ID плеера
  */
 export async function playPlayer(playerId) {
-  // В демо-режиме не отправляем команды
+  const fileUrl = appState.getPlayerSelection(playerId);
+  if (!fileUrl) {
+    addMessage('Выберите файл для воспроизведения', 'warning');
+    return;
+  }
+
+  // В демо-режиме обновляем статус локально
   if (appState.isDemoModeEnabled()) {
+    const status = appState.getPlayerStatus(playerId) || {};
+    status.status = 'play';
+    // Если totlen = 0, устанавливаем демо-длительность
+    if (!status.totlen || status.totlen === 0) {
+      status.totlen = 180000; // 3 минуты
+      status.curpos = 0;
+    }
+    appState.setPlayerStatus(playerId, status);
     addMessage(`[ДЕМО] Воспроизведение на ${playerId}`, 'info');
+
+    // Перерисовываем UI
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
     return;
   }
 
   try {
-    const fileUrl = appState.getPlayerSelection(playerId);
-    if (!fileUrl) {
-      addMessage('Выберите файл для воспроизведения', 'warning');
-      return;
-    }
     await PlayersAPI.playMedia(playerId, fileUrl);
     addMessage('Воспроизведение начато', 'success');
 
@@ -179,9 +193,18 @@ export async function playPlayer(playerId) {
  * @param {string} playerId - ID плеера
  */
 export async function stopPlayer(playerId) {
-  // В демо-режиме не отправляем команды
+  // В демо-режиме обновляем статус локально
   if (appState.isDemoModeEnabled()) {
+    const status = appState.getPlayerStatus(playerId) || {};
+    status.status = 'stop';
+    status.curpos = 0;
+    appState.setPlayerStatus(playerId, status);
     addMessage(`[ДЕМО] Остановка ${playerId}`, 'info');
+
+    // Перерисовываем UI
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
     return;
   }
 
