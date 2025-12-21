@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { networkInterfaces } from 'os';
 
 // Модули приложения
 import WiiMClient from './wiim-client.js';
@@ -68,8 +69,22 @@ app.use(errorMiddleware);
 
 // Запуск сервера
 app.listen(PORT, () => {
+  const interfaces = networkInterfaces();
+  const addresses = [];
+
+  for (const iface of Object.values(interfaces)) {
+    for (const addr of iface) {
+      if (addr.family === 'IPv4' && !addr.internal) {
+        addresses.push(addr.address);
+      }
+    }
+  }
+
   logWithMs(`🚀 Сервер запущен на порту ${PORT}`);
-  logWithMs(`🌐 Откройте http://localhost:${PORT}`);
+  logWithMs(`🌐 Локально: http://localhost:${PORT}`);
+  if (addresses.length > 0) {
+    logWithMs(`🌐 В сети: http://${addresses[0]}:${PORT}`);
+  }
   logWithMs(`🔒 HTTPS для WiiM: ${USE_HTTPS ? 'включен' : 'выключен'}`);
   logWithMs(`⏱️  Таймаут запросов: ${REQUEST_TIMEOUT}ms`);
 });
