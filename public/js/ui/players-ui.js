@@ -15,6 +15,11 @@ export async function loadPlayers() {
     const { players } = await PlayersAPI.getPlayers();
     appState.setPlayers(players || []);
     renderPlayers(players || []);
+
+    // Также обновляем главную вкладку с плеерами
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
   } catch (error) {
     addMessage(`Ошибка загрузки плееров: ${error.message}`, 'error');
   }

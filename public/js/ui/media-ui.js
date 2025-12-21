@@ -18,6 +18,11 @@ export async function loadMedia() {
     appState.setMediaFiles(files || []);
     renderMedia(files || []);
     updateBeepSoundOptions();
+
+    // Обновляем плееры чтобы обновить dropdowns с файлами
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
   } catch (error) {
     addMessage(`Ошибка загрузки медиа: ${error.message}`, 'error');
   }

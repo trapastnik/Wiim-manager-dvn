@@ -111,6 +111,11 @@ export async function refreshAllPlayers() {
       appState.setPlayerStatus(playerId, status);
     }
   });
+
+  // Обновляем UI после получения статусов
+  if (window.renderMultiPlayers) {
+    window.renderMultiPlayers();
+  }
 }
 
 /**
@@ -175,6 +180,9 @@ export async function playPlayer(playerId) {
     }
     await PlayersAPI.playMedia(playerId, fileUrl);
     addMessage('Воспроизведение начато', 'success');
+
+    // Обновляем статус плеера после запуска
+    setTimeout(() => refreshAllPlayers(), 500);
   } catch (error) {
     addMessage(`Ошибка воспроизведения: ${error.message}`, 'error');
   }
@@ -194,6 +202,9 @@ export async function stopPlayer(playerId) {
   try {
     await PlayersAPI.stopPlayer(playerId);
     addMessage('Плеер остановлен', 'success');
+
+    // Обновляем статус плеера после остановки
+    setTimeout(() => refreshAllPlayers(), 500);
   } catch (error) {
     addMessage(`Ошибка остановки: ${error.message}`, 'error');
   }
