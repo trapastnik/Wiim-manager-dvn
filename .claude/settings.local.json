@@ -31,7 +31,15 @@
       "Bash(git push:*)",
       "Bash(git branch:*)",
       "Bash(xargs ps:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(while read func)",
+      "Bash(do)",
+      "Bash(for func in toggleNativeLoop updateLoopModeUI playPlayer stopPlayer playAll stopAll playGroup createPlayerGroup deletePlayerGroup toggleViewMode enableDemoMode disableDemoMode refreshAllPlayers)",
+      "Bash(if grep -q \"window\\.$func\" /Users/dvn/Desktop/DDDD/wiim/public/js/app-main.js)",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(else)",
+      "Bash(fi)"
     ],
     "deny": [],
     "ask": []
