@@ -36,8 +36,21 @@
             <div class="global-controls">
                 <button class="btn btn-success" onclick="playAll()">▶ Запустить все</button>
                 <button class="btn btn-danger" onclick="stopAll()">⏹ Остановить все</button>
-                <!-- Режим повтора ВСЕГДА включён автоматически, кнопка не нужна -->
                 <button class="btn btn-primary" onclick="refreshAllPlayers()">🔄 Обновить статусы</button>
+            </div>
+
+            <!-- Панель Loop Mode (только в расширенном режиме) -->
+            <div class="loop-mode-panel advanced-only" style="display:none;">
+                <h3>🔁 Режим повтора треков</h3>
+                <div class="loop-mode-description">
+                    <p><strong>WiiM Native Loop</strong> - устройство само повторяет треки. Надёжно, работает даже при отключении браузера.</p>
+                </div>
+                <div class="loop-mode-controls">
+                    <button id="native-loop-btn" class="btn btn-secondary" onclick="toggleNativeLoop()">
+                        🔁 Native Loop: OFF
+                    </button>
+                    <span class="loop-mode-hint">Применяется ко всем плеерам</span>
+                </div>
             </div>
 
             <!-- Управление группами -->

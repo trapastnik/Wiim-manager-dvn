@@ -58,7 +58,7 @@ function updateViewModeButton() {
 }
 
 /**
- * Показать/скрыть панель сообщений
+ * Показать/скрыть панель сообщений и расширенные элементы
  */
 function toggleMessagesPanel(mode) {
   const panel = document.querySelector('.messages-panel');
@@ -69,6 +69,16 @@ function toggleMessagesPanel(mode) {
       panel.style.display = 'block';
     }
   }
+
+  // Показываем/скрываем элементы только для расширенного режима
+  const advancedElements = document.querySelectorAll('.advanced-only');
+  advancedElements.forEach(el => {
+    if (mode === 'simple') {
+      el.style.display = 'none';
+    } else {
+      el.style.display = 'block';
+    }
+  });
 }
 
 /**

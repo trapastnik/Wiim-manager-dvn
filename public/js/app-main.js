@@ -27,6 +27,7 @@ import * as RefreshService from './services/refresh-service.js';
 import * as ViewModeService from './services/view-mode.service.js';
 import * as DemoService from './services/demo.service.js';
 import * as ConfigSync from './services/config-sync.service.js';
+import * as LoopModeService from './services/loop-mode.service.js';
 
 // Utils
 import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './utils/format.js';
@@ -99,6 +100,10 @@ window.toggleViewMode = ViewModeService.toggleViewMode;
 window.enableDemoMode = DemoService.enableDemoMode;
 window.disableDemoMode = DemoService.disableDemoMode;
 window.startDemoAnimation = DemoService.startDemoAnimation;
+
+// Services - Loop Mode
+window.toggleNativeLoop = LoopModeService.toggleNativeLoop;
+window.updateLoopModeUI = LoopModeService.updateLoopModeUI;
 
 // Utils
 window.formatFileSize = formatFileSize;
@@ -175,6 +180,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Запускаем автообновление
     startAdaptiveRefresh();
+
+    // Обновляем UI Loop Mode
+    updateLoopModeUI();
 
     addMessage('Приложение готово к работе!', 'success');
   } catch (error) {
