@@ -64,11 +64,7 @@ function createDemoData() {
  * Включить демо-режим
  */
 export function enableDemoMode() {
-  console.log('[DEMO] enableDemoMode() вызвана!');
-
   const { demoPlayers, demoMediaFiles, playerStatuses, playerSelections } = createDemoData();
-  console.log('[DEMO] Создано плееров:', demoPlayers.length);
-  console.log('[DEMO] Создано медиа:', demoMediaFiles.length);
 
   // Устанавливаем демо-режим в AppState
   appState.enableDemoMode();
@@ -97,9 +93,6 @@ export function enableDemoMode() {
 
   // Рендерим плееры на главной вкладке
   renderMultiPlayers();
-
-  console.log('[DEMO] Плееры в AppState:', appState.getPlayers());
-  console.log('[DEMO] Медиа в AppState:', appState.getMediaFiles());
 
   // Обновляем заголовок
   const header = document.querySelector('header h1');
@@ -172,7 +165,6 @@ export function startDemoAnimation() {
     clearInterval(demoAnimationInterval);
   }
   demoAnimationInterval = setInterval(animateDemoProgress, 1000); // Обновление каждую секунду
-  console.log('[DEMO] Анимация прогресса запущена');
 }
 
 /**
@@ -182,7 +174,6 @@ export function stopDemoAnimation() {
   if (demoAnimationInterval) {
     clearInterval(demoAnimationInterval);
     demoAnimationInterval = null;
-    console.log('[DEMO] Анимация прогресса остановлена');
   }
 }
 

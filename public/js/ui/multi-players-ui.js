@@ -8,18 +8,13 @@ import { appState } from '../state/AppState.js';
  * Отрисовать плееры на главной вкладке с полным интерфейсом управления
  */
 export function renderMultiPlayers() {
-  console.log('[RENDER] renderMultiPlayers() вызвана');
-
   const container = document.getElementById('multi-players-list');
   if (!container) {
-    console.error('[RENDER] Контейнер multi-players-list не найден!');
     return;
   }
 
   const players = appState.getPlayers();
   const mediaFiles = appState.getMediaFiles();
-  console.log('[RENDER] Получено плееров из AppState:', players.length, players);
-  console.log('[RENDER] Получено медиа из AppState:', mediaFiles.length, mediaFiles);
 
   if (players.length === 0) {
     container.innerHTML = '<p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>';
