@@ -34,7 +34,10 @@ body {
     overflow-y: auto;
     border-left: 3px solid #667eea;
     box-shadow: -5px 0 20px rgba(0, 0, 0, 0.1);
-    position: relative;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    align-self: flex-start;
 }
 
 .resize-handle {
