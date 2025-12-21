@@ -25,8 +25,8 @@ export function startAdaptiveRefresh() {
 
     appState.isAnyPlayerPlaying = isPlaying;
 
-    // Устанавливаем интервал: 2 сек если играет, 10 сек если нет
-    const interval = isPlaying ? 2000 : 10000;
+    // Устанавливаем интервал: 5 сек если играет, 20 сек если нет
+    const interval = isPlaying ? 5000 : 20000;
 
     appState.adaptiveRefreshTimer = setTimeout(checkAndRefresh, interval);
   };
