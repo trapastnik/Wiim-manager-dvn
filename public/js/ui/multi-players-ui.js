@@ -198,9 +198,6 @@ export function renderMultiPlayers() {
           <button class="btn btn-danger" onclick="stopPlayer('${player.id}')">
             ⏹ Stop
           </button>
-          <button class="btn btn-info btn-small" onclick="playBeep('${player.id}')" title="Воспроизвести звуковой сигнал для идентификации плеера">
-            🔔 Пищалка
-          </button>
         </div>
 
         <div class="player-volume-control">

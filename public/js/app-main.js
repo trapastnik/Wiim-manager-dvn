@@ -77,7 +77,6 @@ window.playMediaOnAllPlayers = PlayerService.playMediaOnAllPlayers;
 window.stopAll = PlayerService.stopAll;
 window.playAll = PlayerService.playAll;
 window.refreshAllPlayers = PlayerService.refreshAllPlayers;
-window.playBeep = PlayerService.playBeep;
 window.setVolume = PlayerService.setVolume;
 window.setLoopMode = PlayerService.setLoopMode;
 window.playPlayer = PlayerService.playPlayer;

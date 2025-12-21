@@ -119,20 +119,6 @@ export async function refreshAllPlayers() {
 }
 
 /**
- * Воспроизвести звуковой сигнал на плеере
- * @param {string} playerId - ID плеера
- * @param {string} soundFile - файл звука (опционально)
- */
-export async function playBeep(playerId, soundFile = null) {
-  try {
-    await PlayersAPI.playBeep(playerId, soundFile);
-    addMessage('Сигнал отправлен', 'success');
-  } catch (error) {
-    addMessage(`Ошибка отправки сигнала: ${error.message}`, 'error');
-  }
-}
-
-/**
  * Установить громкость для плеера
  * @param {string} playerId - ID плеера
  * @param {number} volume - уровень громкости (0-100)

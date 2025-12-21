@@ -753,13 +753,33 @@ h1 {
 /* Список плееров для мультиуправления */
 .multi-players-list {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 15px;
+}
+
+/* Адаптивность для разных размеров экрана */
+@media (min-width: 1600px) {
+    .multi-players-list {
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    }
+}
+
+@media (max-width: 1200px) {
+    .multi-players-list {
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
 }
 
 @media (max-width: 768px) {
     .multi-players-list {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .multi-players-list {
+        grid-template-columns: 1fr;
+        gap: 10px;
     }
 }
 
@@ -1799,6 +1819,12 @@ h1 {
 
 .player-control-card.simple-mode.playing {
     background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+
+/* Скрываем Wi-Fi информацию, ping и прочие технические детали в простом режиме */
+.player-control-card.simple-mode .player-wifi-info,
+.player-control-card.simple-mode .player-ping {
+    display: none !important;
 }
 
 /* Упрощаем шапку карточки */
