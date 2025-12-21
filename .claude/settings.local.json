@@ -20,7 +20,18 @@
       "Bash(git add:*)",
       "Bash(node --check:*)",
       "Bash(npm start)",
-      "Bash(git restore API_COMPLIANCE_REPORT.md AUTOSTART_FIX.md GIT_COMMIT.md OPTIMIZATION_SUMMARY.md SCAN_DUPLICATES_FIX.md START.sh TEST_INSTRUCTIONS.md docs/RASPBERRY_PI.md docs/RASPBERRY_PI_SETUP.md docs/UPDATE_GUIDE.md install-rpi.sh wifi-connect.sh wifi-networks.json.example)"
+      "Bash(git restore API_COMPLIANCE_REPORT.md AUTOSTART_FIX.md GIT_COMMIT.md OPTIMIZATION_SUMMARY.md SCAN_DUPLICATES_FIX.md START.sh TEST_INSTRUCTIONS.md docs/RASPBERRY_PI.md docs/RASPBERRY_PI_SETUP.md docs/UPDATE_GUIDE.md install-rpi.sh wifi-connect.sh wifi-networks.json.example)",
+      "Bash(wc:*)",
+      "Bash(for file in /Users/dvn/Desktop/DDDD/wiim/public/js/**/*.js /Users/dvn/Desktop/DDDD/wiim/public/js/*.js)",
+      "Bash(done)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git branch:*)",
+      "Bash(xargs ps:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

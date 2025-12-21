@@ -11,6 +11,7 @@ class AppState {
 
     // UI состояние
     this.currentTab = 'player';
+    this.viewMode = 'advanced'; // 'simple' или 'advanced'
 
     // Данные
     this.allPlayers = [];
@@ -162,6 +163,16 @@ class AppState {
 
   getServerInfo() {
     return this.serverInfo;
+  }
+
+  // === Режим просмотра ===
+
+  setViewMode(mode) {
+    this.viewMode = mode;
+  }
+
+  getViewMode() {
+    return this.viewMode;
   }
 
   // === Сброс состояния ===

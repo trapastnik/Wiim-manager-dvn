@@ -23,6 +23,7 @@ import * as ConfigAPI from './api/config-api.js';
 // Services
 import * as PlayerService from './services/player-service.js';
 import * as RefreshService from './services/refresh-service.js';
+import * as ViewModeService from './services/view-mode.service.js';
 
 // Utils
 import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './utils/format.js';
@@ -82,6 +83,9 @@ window.startAdaptiveRefresh = RefreshService.startAdaptiveRefresh;
 window.stopAdaptiveRefresh = RefreshService.stopAdaptiveRefresh;
 window.startTemporaryAutoRefresh = RefreshService.startTemporaryAutoRefresh;
 
+// Services - View Mode
+window.toggleViewMode = ViewModeService.toggleViewMode;
+
 // Utils
 window.formatFileSize = formatFileSize;
 window.formatTime = formatTime;
@@ -106,6 +110,9 @@ console.log('📦 Загружено модулей:', {
 
 // Инициализация приложения при загрузке DOM
 document.addEventListener('DOMContentLoaded', async () => {
+  // Инициализация режима просмотра
+  ViewModeService.initViewMode();
+
   addMessage('Инициализация приложения...', 'info');
 
   try {
@@ -154,6 +161,7 @@ export {
   ConfigAPI,
   PlayerService,
   RefreshService,
+  ViewModeService,
   formatFileSize,
   formatTime,
   formatTimestamp,
