@@ -105,6 +105,9 @@ export function enableDemoMode() {
 
   // Показываем/скрываем кнопки
   updateDemoButtons(true);
+
+  // Запускаем анимацию прогресса (вызывается автоматически из HTML, но на всякий случай)
+  startDemoAnimation();
 }
 
 /**
@@ -188,8 +191,9 @@ function animateDemoProgress() {
     return;
   }
 
-  // Обновляем позиции играющих плееров
-  appState.players.forEach(player => {
+  // Обновляем позиции играющих плееров (используем геттер!)
+  const players = appState.getPlayers();
+  players.forEach(player => {
     const status = appState.getPlayerStatus(player.id);
     if (status && status.status === 'play' && status.totlen > 0) {
       // Увеличиваем текущую позицию на 1 секунду
