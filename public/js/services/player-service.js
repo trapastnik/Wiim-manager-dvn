@@ -34,6 +34,9 @@ export async function playMediaOnAllPlayers(fileUrl) {
   if (failed > 0) {
     addMessage(`Ошибка на ${failed} плеерах`, 'error');
   }
+
+  // Обновляем статусы всех плееров
+  setTimeout(() => refreshAllPlayers(), 300);
 }
 
 /**
@@ -54,6 +57,9 @@ export async function stopAll() {
   );
 
   addMessage('Все плееры остановлены', 'success');
+
+  // Обновляем статусы всех плееров
+  setTimeout(() => refreshAllPlayers(), 300);
 }
 
 /**
@@ -86,6 +92,9 @@ export async function playAll() {
 
   const successful = results.filter(r => r.status === 'fulfilled').length;
   addMessage(`Запущено: ${successful} плееров`, 'success');
+
+  // Обновляем статусы всех плееров
+  setTimeout(() => refreshAllPlayers(), 300);
 }
 
 /**
@@ -178,13 +187,29 @@ export async function playPlayer(playerId) {
   }
 
   try {
+    // Немедленно обновляем UI локально для быстрого отклика
+    const status = appState.getPlayerStatus(playerId) || {};
+    status.status = 'play';
+    appState.setPlayerStatus(playerId, status);
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
+
+    // Отправляем команду на устройство
     await PlayersAPI.playMedia(playerId, fileUrl);
     addMessage('Воспроизведение начато', 'success');
 
-    // Обновляем статус плеера после запуска
-    setTimeout(() => refreshAllPlayers(), 500);
+    // Запрашиваем реальный статус с устройства
+    setTimeout(() => refreshAllPlayers(), 300);
   } catch (error) {
     addMessage(`Ошибка воспроизведения: ${error.message}`, 'error');
+    // При ошибке возвращаем статус обратно
+    const status = appState.getPlayerStatus(playerId) || {};
+    status.status = 'stop';
+    appState.setPlayerStatus(playerId, status);
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
   }
 }
 
@@ -209,13 +234,25 @@ export async function stopPlayer(playerId) {
   }
 
   try {
+    // Немедленно обновляем UI локально для быстрого отклика
+    const status = appState.getPlayerStatus(playerId) || {};
+    status.status = 'stop';
+    status.curpos = 0;
+    appState.setPlayerStatus(playerId, status);
+    if (window.renderMultiPlayers) {
+      window.renderMultiPlayers();
+    }
+
+    // Отправляем команду на устройство
     await PlayersAPI.stopPlayer(playerId);
     addMessage('Плеер остановлен', 'success');
 
-    // Обновляем статус плеера после остановки
-    setTimeout(() => refreshAllPlayers(), 500);
+    // Запрашиваем реальный статус с устройства
+    setTimeout(() => refreshAllPlayers(), 300);
   } catch (error) {
     addMessage(`Ошибка остановки: ${error.message}`, 'error');
+    // При ошибке обновляем статус с устройства
+    setTimeout(() => refreshAllPlayers(), 100);
   }
 }
 
