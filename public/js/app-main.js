@@ -115,7 +115,7 @@ window.ConfigAPI = ConfigAPI;
 console.log('✅ Модульная система загружена');
 console.log('📦 Загружено модулей:', {
   state: 'AppState',
-  ui: ['messages', 'tabs', 'players-ui', 'media-ui', 'groups-ui'],
+  ui: ['messages', 'tabs', 'players-ui', 'multi-players-ui', 'media-ui', 'groups-ui'],
   api: ['players-api', 'media-api', 'config-api'],
   services: ['player-service', 'refresh-service', 'view-mode', 'demo'],
   utils: ['format', 'dom']
@@ -167,6 +167,7 @@ export {
   clearMessages,
   switchTab,
   PlayersUI,
+  MultiPlayersUI,
   MediaUI,
   GroupsUI,
   PlayersAPI,
