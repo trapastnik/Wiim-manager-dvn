@@ -86,8 +86,8 @@ export function enableDemoMode() {
   addMessage('💡 Все функции работают в демо-режиме, но команды не отправляются на реальные устройства', 'info');
 
   // Обновляем UI
-  renderPlayers();
-  renderMedia();
+  renderPlayers(demoPlayers);
+  renderMedia(demoMediaFiles);
   renderPlayerGroups();
 
   // Обновляем заголовок
