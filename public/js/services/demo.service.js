@@ -90,6 +90,9 @@ export function enableDemoMode() {
   renderMedia(demoMediaFiles);
   renderPlayerGroups();
 
+  // Рендерим плееры на главной вкладке (временное решение)
+  renderMultiPlayersList(demoPlayers);
+
   // Обновляем заголовок
   const header = document.querySelector('header h1');
   if (header) {
@@ -237,4 +240,92 @@ function updatePlayerProgress(playerId, status) {
     progressTimes[0].textContent = formatTime(curpos);
     progressTimes[1].textContent = formatTime(totlen);
   }
+}
+
+/**
+ * Рендерить плееры на главной вкладке (multi-players-list)
+ * ВРЕМЕННОЕ РЕШЕНИЕ: полная функция renderMultiPlayers будет восстановлена позже
+ */
+function renderMultiPlayersList(players) {
+  const container = document.getElementById('multi-players-list');
+  if (!container) return;
+
+  if (!players || players.length === 0) {
+    container.innerHTML = '<p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>';
+    return;
+  }
+
+  container.innerHTML = players.map(player => {
+    const status = appState.getPlayerStatus(player.id) || {};
+    const playerState = status.status || 'stop';
+    const volume = status.vol !== undefined ? parseInt(status.vol) : 50;
+    const trackTitle = status.Title || 'Нет трека';
+    const trackArtist = status.Artist || '';
+
+    // Данные о прогрессе
+    const curpos = parseInt(status.curpos) || 0;
+    const totlen = parseInt(status.totlen) || 0;
+    const progress = totlen > 0 ? (curpos / totlen) * 100 : 0;
+
+    const formatTime = (ms) => {
+      const seconds = Math.floor(ms / 1000);
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    return `
+      <div class="player-control-card ${playerState === 'play' ? 'playing' : 'stopped'}" data-player-id="${player.id}">
+        <div class="player-card-header">
+          <div class="player-card-title">
+            <input type="checkbox" id="group-cb-${player.id}"
+                   onchange="togglePlayerSelection('${player.id}')"
+                   class="group-checkbox"
+                   title="Выбрать для группы">
+            ${player.name}
+          </div>
+          <div class="player-card-status ${playerState}">
+            ${playerState === 'play' ? '▶ Играет' : '⏹ Остановлен'}
+          </div>
+        </div>
+
+        ${playerState === 'play' && totlen > 0 ? `
+          <div class="player-progress">
+            <div class="progress-bar-container">
+              <div class="progress-bar-fill" style="width: ${progress}%"></div>
+            </div>
+            <div class="progress-time">
+              <span>${formatTime(curpos)}</span>
+              <span>${formatTime(totlen)}</span>
+            </div>
+          </div>
+        ` : ''}
+
+        ${trackTitle && trackTitle !== 'Нет трека' ? `
+          <div class="player-card-track">
+            <div class="player-track-title">${trackTitle}</div>
+            ${trackArtist ? `<div class="player-track-artist">${trackArtist}</div>` : ''}
+          </div>
+        ` : ''}
+
+        <div class="player-card-controls">
+          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'prev')" class="btn btn-control" title="Предыдущий">⏮</button>
+          ${playerState === 'play'
+            ? `<button onclick="window.PlayerService?.controlPlayer('${player.id}', 'pause')" class="btn btn-control btn-pause" title="Пауза">⏸</button>`
+            : `<button onclick="window.PlayerService?.controlPlayer('${player.id}', 'play')" class="btn btn-control btn-play" title="Воспроизвести">▶</button>`
+          }
+          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'stop')" class="btn btn-control" title="Стоп">⏹</button>
+          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'next')" class="btn btn-control" title="Следующий">⏭</button>
+        </div>
+
+        <div class="player-card-volume">
+          <span class="volume-icon">🔊</span>
+          <input type="range" min="0" max="100" value="${volume}"
+                 onchange="window.setVolume('${player.id}', this.value)"
+                 class="volume-slider" title="Громкость">
+          <span class="volume-value">${volume}%</span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
