@@ -69,9 +69,9 @@ export function enableDemoMode() {
   // Устанавливаем демо-режим в AppState
   appState.enableDemoMode();
 
-  // Сохраняем демо-данные в AppState
-  appState.players = demoPlayers;
-  appState.mediaFiles = demoMediaFiles;
+  // Сохраняем демо-данные в AppState (используем методы, а не прямое присваивание!)
+  appState.setPlayers(demoPlayers);
+  appState.setMediaFiles(demoMediaFiles);
 
   // Сохраняем статусы и выбранные файлы
   demoPlayers.forEach(player => {
@@ -93,6 +93,9 @@ export function enableDemoMode() {
 
   // Рендерим плееры на главной вкладке
   renderMultiPlayers();
+
+  console.log('[DEMO] Плееры в AppState:', appState.getPlayers());
+  console.log('[DEMO] Медиа в AppState:', appState.getMediaFiles());
 
   // Обновляем заголовок
   const header = document.querySelector('header h1');
