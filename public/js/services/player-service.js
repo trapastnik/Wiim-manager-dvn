@@ -23,7 +23,12 @@ export async function playMediaOnAllPlayers(fileUrl) {
   addMessage(`Запуск на ${players.length} плеерах...`, 'info');
 
   const results = await Promise.allSettled(
-    players.map(player => PlayersAPI.playMedia(player.id, fileUrl))
+    players.map(async player => {
+      // Устанавливаем loop mode перед воспроизведением
+      const loopMode = appState.getPlayerLoopMode(player.id) || 2;
+      await PlayersAPI.setLoopMode(player.id, loopMode);
+      return PlayersAPI.playMedia(player.id, fileUrl);
+    })
   );
 
   const successful = results.filter(r => r.status === 'fulfilled').length;
@@ -85,8 +90,11 @@ export async function playAll() {
   addMessage(`Запуск ${playersWithSelection.length} плееров...`, 'info');
 
   const results = await Promise.allSettled(
-    playersWithSelection.map(player => {
+    playersWithSelection.map(async player => {
       const fileUrl = appState.getPlayerSelection(player.id);
+      // Устанавливаем loop mode перед воспроизведением
+      const loopMode = appState.getPlayerLoopMode(player.id) || 2;
+      await PlayersAPI.setLoopMode(player.id, loopMode);
       return PlayersAPI.playMedia(player.id, fileUrl);
     })
   );
@@ -189,6 +197,12 @@ export async function playPlayer(playerId) {
   }
 
   try {
+    // Устанавливаем loop mode = 2 (repeat all) перед воспроизведением
+    // Это заставляет WiiM устройство автоматически повторять трек
+    const loopMode = appState.getPlayerLoopMode(playerId) || 2;
+    await PlayersAPI.setLoopMode(playerId, loopMode);
+    console.log(`[LOOP] ${playerId} → loopMode ${loopMode}`);
+
     // Отправляем команду на устройство
     await PlayersAPI.playMedia(playerId, fileUrl);
     addMessage('Воспроизведение начато', 'success');

@@ -99,11 +99,11 @@ export async function setVolume(playerId, volume) {
 /**
  * Включить/выключить режим повтора
  * @param {string} playerId - ID плеера
- * @param {number} mode - режим (0=off, 1=single loop)
+ * @param {number} mode - режим (0=off, 1=single loop, 2=repeat all)
  * @returns {Promise<{success: boolean}>}
  */
 export async function setLoopMode(playerId, mode) {
-  return await post(`/api/players/${playerId}/loopmode`, { mode });
+  return await post(`/api/players/${playerId}/loop`, { mode });
 }
 
 /**
