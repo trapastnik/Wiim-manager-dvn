@@ -6,6 +6,7 @@
 import { appState } from '../state/AppState.js';
 import { addMessage } from '../ui/messages.js';
 import * as PlayersAPI from '../api/players-api.js';
+import * as ConfigSync from './config-sync.service.js';
 
 /**
  * Воспроизвести файл на всех плеерах
@@ -150,6 +151,7 @@ export async function setLoopMode(playerId, mode) {
   try {
     await PlayersAPI.setLoopMode(playerId, mode);
     appState.setPlayerLoopMode(playerId, mode);
+    ConfigSync.saveLoopModes(); // Автосохранение режима повтора
     addMessage(`Режим повтора: ${mode === 1 ? 'включен' : 'выключен'}`, 'success');
   } catch (error) {
     addMessage(`Ошибка установки режима: ${error.message}`, 'error');
@@ -237,6 +239,7 @@ export async function stopPlayer(playerId) {
  */
 export function selectMediaForPlayer(playerId, fileUrl) {
   appState.setPlayerSelection(playerId, fileUrl);
+  ConfigSync.savePlayerSelections(); // Автосохранение на сервер
   addMessage(`Файл выбран для плеера`, 'success');
 }
 
@@ -257,6 +260,7 @@ export async function setPlayerVolume(playerId, volume) {
   try {
     await PlayersAPI.setVolume(playerId, volume);
     appState.setPlayerVolume(playerId, volume);
+    ConfigSync.saveVolumes(); // Автосохранение громкости
     const volumeDisplay = document.getElementById(`volume-value-${playerId}`);
     if (volumeDisplay) volumeDisplay.textContent = volume;
   } catch (error) {

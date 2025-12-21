@@ -26,6 +26,7 @@ import * as PlayerService from './services/player-service.js';
 import * as RefreshService from './services/refresh-service.js';
 import * as ViewModeService from './services/view-mode.service.js';
 import * as DemoService from './services/demo.service.js';
+import * as ConfigSync from './services/config-sync.service.js';
 
 // Utils
 import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './utils/format.js';
@@ -142,6 +143,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Загружаем конфигурацию
     const config = await ConfigAPI.getConfig();
     console.log('Config loaded:', config);
+
+    // Восстанавливаем сохраненные настройки из конфига
+    if (config.playerSelections) {
+      Object.entries(config.playerSelections).forEach(([playerId, fileUrl]) => {
+        appState.setPlayerSelection(playerId, fileUrl);
+      });
+      console.log('[CONFIG] Player selections restored');
+    }
+
+    if (config.playerLoopModes) {
+      Object.entries(config.playerLoopModes).forEach(([playerId, mode]) => {
+        appState.setPlayerLoopMode(playerId, mode);
+      });
+      console.log('[CONFIG] Loop modes restored');
+    }
+
+    if (config.playerVolumes) {
+      Object.entries(config.playerVolumes).forEach(([playerId, volume]) => {
+        appState.setPlayerVolume(playerId, volume);
+      });
+      console.log('[CONFIG] Player volumes restored');
+    }
 
     // Загружаем данные
     await loadPlayers();

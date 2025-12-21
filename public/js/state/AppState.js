@@ -115,6 +115,18 @@ class AppState {
     this.playerVolumes[playerId] = volume;
   }
 
+  getAllPlayerSelections() {
+    return { ...this.playerSelections };
+  }
+
+  getAllLoopModes() {
+    return { ...this.playerLoopModes };
+  }
+
+  getAllVolumes() {
+    return { ...this.playerVolumes };
+  }
+
   // === Методы для работы с группами ===
 
   getPlayerGroups() {
