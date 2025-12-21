@@ -78,29 +78,35 @@ export async function scanPlayers() {
   let progressInterval;
 
   try {
-    // Начинаем прогресс
-    if (progressFill) progressFill.style.width = '10%';
-    if (scanStatus) scanStatus.textContent = 'Сканирование локальной сети...';
-    addMessage('Сканирование локальной сети (это может занять 30-60 сек)', 'info');
+    // Запускаем сканирование в фоне (не ждём)
+    const scanPromise = PlayersAPI.scanPlayers();
 
-    // Анимация прогресса
-    let currentProgress = 10;
-    progressInterval = setInterval(() => {
-      if (currentProgress < 90 && progressFill) {
-        currentProgress += 1;
-        progressFill.style.width = currentProgress + '%';
+    // Начинаем опрос прогресса каждые 500ms
+    progressInterval = setInterval(async () => {
+      try {
+        const response = await fetch('/api/scanner/progress');
+        const progress = await response.json();
 
-        if (currentProgress % 10 === 0 && scanStatus) {
-          const percent = Math.round(currentProgress);
-          scanStatus.textContent = `Сканирование локальной сети... ${percent}%`;
+        if (progressFill) {
+          progressFill.style.width = progress.progress + '%';
         }
+
+        if (scanStatus) {
+          if (progress.isScanning) {
+            scanStatus.textContent = `Сканирование ${progress.currentIP} (${progress.current}/${progress.total}) — Найдено: ${progress.found}`;
+          } else {
+            scanStatus.textContent = `Сканирование завершено — Найдено: ${progress.found}`;
+          }
+        }
+      } catch (err) {
+        console.error('Ошибка получения прогресса:', err);
       }
-    }, 300);
+    }, 500);
 
     const startTime = Date.now();
-    const result = await PlayersAPI.scanPlayers();
+    const result = await scanPromise;
 
-    // Останавливаем анимацию
+    // Останавливаем опрос
     clearInterval(progressInterval);
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 

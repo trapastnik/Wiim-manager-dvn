@@ -12,5 +12,10 @@ export function createScannerRouter(networkScanner) {
     scannerController.scanNetwork(req, res, networkScanner)
   );
 
+  // Получить прогресс сканирования
+  router.get('/progress', (req, res) =>
+    scannerController.getScanProgress(req, res)
+  );
+
   return router;
 }

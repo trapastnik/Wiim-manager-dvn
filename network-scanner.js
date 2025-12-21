@@ -102,20 +102,44 @@ class NetworkScanner {
   }
 
   // Быстрое сканирование - сканирует всю подсеть параллельно
-  async quickScan() {
+  async quickScan(progressCallback = null) {
     console.log(`Быстрое сканирование сети ${this.subnet}.0/24...`);
     console.log(`Проверка IP адресов от ${this.subnet}.1 до ${this.subnet}.254...`);
 
+    const total = 254;
+    let completed = 0;
+    const found = [];
+
     // Сканируем весь диапазон параллельно с коротким таймаутом
     const promises = [];
-    for (let i = 1; i <= 254; i++) {
+    for (let i = 1; i <= total; i++) {
       const ip = `${this.subnet}.${i}`;
-      promises.push(this.checkWiiMDevice(ip));
+      const promise = this.checkWiiMDevice(ip).then(result => {
+        completed++;
+        const progress = Math.round((completed / total) * 100);
+
+        if (progressCallback) {
+          progressCallback({
+            current: completed,
+            total: total,
+            progress: progress,
+            currentIP: ip,
+            found: found.length
+          });
+        }
+
+        if (result.found) {
+          found.push(result);
+          console.log(`  ✓ Найден: ${result.ip} - ${result.data.DeviceName || 'unknown'}`);
+        }
+
+        return result;
+      });
+      promises.push(promise);
     }
 
     console.log('Запущена параллельная проверка 254 адресов...');
-    const results = await Promise.all(promises);
-    const found = results.filter(r => r.found);
+    await Promise.all(promises);
 
     console.log(`\nНайдено WiiM устройств: ${found.length}`);
     found.forEach(device => {
