@@ -259,8 +259,9 @@ function renderMultiPlayersList(players) {
     const status = appState.getPlayerStatus(player.id) || {};
     const playerState = status.status || 'stop';
     const volume = status.vol !== undefined ? parseInt(status.vol) : 50;
-    const trackTitle = status.Title || 'Нет трека';
+    const trackTitle = status.Title || '';
     const trackArtist = status.Artist || '';
+    const currentFile = appState.getPlayerSelection(player.id) || '';
 
     // Данные о прогрессе
     const curpos = parseInt(status.curpos) || 0;
@@ -273,6 +274,14 @@ function renderMultiPlayersList(players) {
       const secs = seconds % 60;
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    const formatFileSize = (bytes) => {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    };
+
+    const hasTrackInfo = trackTitle && trackTitle !== 'Unknown' && !trackTitle.startsWith('http');
 
     return `
       <div class="player-control-card ${playerState === 'play' ? 'playing' : 'stopped'}" data-player-id="${player.id}">
@@ -301,29 +310,44 @@ function renderMultiPlayersList(players) {
           </div>
         ` : ''}
 
-        ${trackTitle && trackTitle !== 'Нет трека' ? `
+        ${hasTrackInfo ? `
           <div class="player-card-track">
             <div class="player-track-title">${trackTitle}</div>
             ${trackArtist ? `<div class="player-track-artist">${trackArtist}</div>` : ''}
           </div>
         ` : ''}
 
-        <div class="player-card-controls">
-          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'prev')" class="btn btn-control" title="Предыдущий">⏮</button>
-          ${playerState === 'play'
-            ? `<button onclick="window.PlayerService?.controlPlayer('${player.id}', 'pause')" class="btn btn-control btn-pause" title="Пауза">⏸</button>`
-            : `<button onclick="window.PlayerService?.controlPlayer('${player.id}', 'play')" class="btn btn-control btn-play" title="Воспроизвести">▶</button>`
-          }
-          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'stop')" class="btn btn-control" title="Стоп">⏹</button>
-          <button onclick="window.PlayerService?.controlPlayer('${player.id}', 'next')" class="btn btn-control" title="Следующий">⏭</button>
+        <div class="player-media-select">
+          <label>Выберите файл для воспроизведения:</label>
+          <select onchange="window.selectMediaForPlayer('${player.id}', this.value)">
+            <option value="">— Не выбрано —</option>
+            ${appState.mediaFiles.map(file => `
+              <option value="${file.path}" ${currentFile === file.path ? 'selected' : ''}>
+                ${file.name} (${formatFileSize(file.size)})
+              </option>
+            `).join('')}
+          </select>
         </div>
 
-        <div class="player-card-volume">
-          <span class="volume-icon">🔊</span>
+        <div class="player-card-controls">
+          <button class="btn btn-success" onclick="window.playPlayer('${player.id}')" ${!currentFile ? 'disabled' : ''}>
+            ▶ Играть
+          </button>
+          <button class="btn btn-danger" onclick="window.stopPlayer('${player.id}')">
+            ⏹ Stop
+          </button>
+          <button class="btn btn-info btn-small" onclick="window.playBeep('${player.id}')" title="Воспроизвести звуковой сигнал для идентификации плеера">
+            🔔 Пищалка
+          </button>
+        </div>
+
+        <div class="player-volume-control">
+          <button class="btn btn-small" onclick="window.adjustVolume('${player.id}', -5)">−</button>
           <input type="range" min="0" max="100" value="${volume}"
-                 onchange="window.setVolume('${player.id}', this.value)"
-                 class="volume-slider" title="Громкость">
-          <span class="volume-value">${volume}%</span>
+                 id="volume-slider-${player.id}"
+                 oninput="window.setPlayerVolume('${player.id}', this.value)">
+          <span class="player-volume-value" id="volume-value-${player.id}">${volume}</span>
+          <button class="btn btn-small" onclick="window.adjustVolume('${player.id}', 5)">+</button>
         </div>
       </div>
     `;

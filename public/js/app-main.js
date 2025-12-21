@@ -78,6 +78,11 @@ window.refreshAllPlayers = PlayerService.refreshAllPlayers;
 window.playBeep = PlayerService.playBeep;
 window.setVolume = PlayerService.setVolume;
 window.setLoopMode = PlayerService.setLoopMode;
+window.playPlayer = PlayerService.playPlayer;
+window.stopPlayer = PlayerService.stopPlayer;
+window.selectMediaForPlayer = PlayerService.selectMediaForPlayer;
+window.setPlayerVolume = PlayerService.setPlayerVolume;
+window.adjustVolume = PlayerService.adjustVolume;
 
 // Services - Refresh
 window.startAdaptiveRefresh = RefreshService.startAdaptiveRefresh;
