@@ -17,7 +17,9 @@ export function renderMultiPlayers() {
   }
 
   const players = appState.getPlayers();
+  const mediaFiles = appState.getMediaFiles();
   console.log('[RENDER] Получено плееров из AppState:', players.length, players);
+  console.log('[RENDER] Получено медиа из AppState:', mediaFiles.length, mediaFiles);
 
   if (players.length === 0) {
     container.innerHTML = '<p class="empty-state">Нет плееров. Добавьте плееры на вкладке "Устройства".</p>';
@@ -111,7 +113,7 @@ export function renderMultiPlayers() {
             <label>Файл:</label>
             <select onchange="selectMediaForPlayer('${player.id}', this.value)">
               <option value="">— Не выбрано —</option>
-              ${appState.mediaFiles.map(file => `
+              ${mediaFiles.map(file => `
                 <option value="${file.path}" ${currentFile === file.path ? 'selected' : ''}>
                   ${file.name}
                 </option>
@@ -186,7 +188,7 @@ export function renderMultiPlayers() {
           <label>Выберите файл для воспроизведения:</label>
           <select onchange="selectMediaForPlayer('${player.id}', this.value)">
             <option value="">— Не выбрано —</option>
-            ${appState.mediaFiles.map(file => `
+            ${mediaFiles.map(file => `
               <option value="${file.path}" ${currentFile === file.path ? 'selected' : ''}>
                 ${file.name} (${formatFileSize(file.size)})
               </option>
