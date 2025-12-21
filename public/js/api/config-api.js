@@ -58,10 +58,11 @@ export async function cleanupBrokenStates() {
 
 /**
  * Синхронизировать конфигурацию
+ * @param {Object} data - данные для синхронизации (playerSelections, playerGroups, playerVolumes и т.д.)
  * @returns {Promise<{success: boolean}>}
  */
-export async function syncConfig() {
-  return await post('/api/config/sync');
+export async function syncConfig(data = {}) {
+  return await post('/api/config/sync', data);
 }
 
 /**

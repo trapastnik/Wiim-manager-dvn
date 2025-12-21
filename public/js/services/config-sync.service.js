@@ -79,3 +79,23 @@ export function saveVolumes() {
     }
   }, 300);
 }
+
+/**
+ * Сохранить группы плееров
+ */
+export async function savePlayerGroups() {
+  // В демо-режиме не сохраняем
+  if (appState.isDemoModeEnabled()) return;
+
+  try {
+    const groups = appState.getPlayerGroups();
+    const selections = appState.getAllPlayerSelections();
+    await ConfigAPI.syncConfig({
+      playerGroups: groups,
+      playerSelections: selections
+    });
+    console.log('[CONFIG-SYNC] Player groups saved');
+  } catch (error) {
+    console.error('[CONFIG-SYNC] Error saving player groups:', error);
+  }
+}

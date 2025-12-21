@@ -5,6 +5,7 @@
 import { appState } from '../state/AppState.js';
 import { addMessage } from './messages.js';
 import { getElement, setHTML } from '../utils/dom.js';
+import * as ConfigSync from '../services/config-sync.service.js';
 
 /**
  * Переключить выбор плеера для группы
@@ -72,7 +73,7 @@ export function createPlayerGroup() {
   addMessage(`Группа "${groupName}" создана`, 'success');
   clearPlayerSelection();
   renderPlayerGroups();
-  savePlayerGroups();
+  ConfigSync.savePlayerGroups();
 }
 
 /**
@@ -98,7 +99,7 @@ export function deletePlayerGroup(groupId) {
 
   addMessage('Группа удалена', 'success');
   renderPlayerGroups();
-  savePlayerGroups();
+  ConfigSync.savePlayerGroups();
 }
 
 /**
@@ -129,21 +130,6 @@ export function renderPlayerGroups() {
   `).join('');
 
   setHTML('player-groups-list', html);
-}
-
-/**
- * Сохранить группы на сервер
- */
-async function savePlayerGroups() {
-  // Сохранение будет через ConfigAPI если доступен
-  if (window.ConfigAPI) {
-    try {
-      const groups = appState.getPlayerGroups();
-      await window.ConfigAPI.saveSettings({ playerGroups: groups });
-    } catch (error) {
-      console.error('Ошибка сохранения групп:', error);
-    }
-  }
 }
 
 /**
