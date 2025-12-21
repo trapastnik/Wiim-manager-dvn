@@ -24,6 +24,7 @@ import * as ConfigAPI from './api/config-api.js';
 import * as PlayerService from './services/player-service.js';
 import * as RefreshService from './services/refresh-service.js';
 import * as ViewModeService from './services/view-mode.service.js';
+import * as DemoService from './services/demo.service.js';
 
 // Utils
 import { formatFileSize, formatTime, formatTimestamp, formatUptime } from './utils/format.js';
@@ -86,6 +87,11 @@ window.startTemporaryAutoRefresh = RefreshService.startTemporaryAutoRefresh;
 // Services - View Mode
 window.toggleViewMode = ViewModeService.toggleViewMode;
 
+// Services - Demo Mode
+window.enableDemoMode = DemoService.enableDemoMode;
+window.disableDemoMode = DemoService.disableDemoMode;
+window.startDemoAnimation = DemoService.startDemoAnimation;
+
 // Utils
 window.formatFileSize = formatFileSize;
 window.formatTime = formatTime;
@@ -104,7 +110,7 @@ console.log('📦 Загружено модулей:', {
   state: 'AppState',
   ui: ['messages', 'tabs', 'players-ui', 'media-ui', 'groups-ui'],
   api: ['players-api', 'media-api', 'config-api'],
-  services: ['player-service', 'refresh-service'],
+  services: ['player-service', 'refresh-service', 'view-mode', 'demo'],
   utils: ['format', 'dom']
 });
 
@@ -162,6 +168,7 @@ export {
   PlayerService,
   RefreshService,
   ViewModeService,
+  DemoService,
   formatFileSize,
   formatTime,
   formatTimestamp,
