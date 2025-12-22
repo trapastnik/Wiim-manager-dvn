@@ -40,6 +40,15 @@ export async function savePanelWidth(width) {
 }
 
 /**
+ * Сохранить ширину панели сообщений (алиас для savePanelWidth)
+ * @param {number} width - ширина в пикселях
+ * @returns {Promise<{success: boolean}>}
+ */
+export async function saveMessagesPanelWidth(width) {
+  return await savePanelWidth(width);
+}
+
+/**
  * Сохранить экспериментальные настройки Loop режима
  * @param {Object} settings - настройки
  * @returns {Promise<{success: boolean}>}

@@ -89,18 +89,41 @@ export async function playAll() {
 
   addMessage(`Запуск ${playersWithSelection.length} плееров...`, 'info');
 
-  const results = await Promise.allSettled(
-    playersWithSelection.map(async player => {
-      const fileUrl = appState.getPlayerSelection(player.id);
-      // Устанавливаем loop mode перед воспроизведением
-      const loopMode = appState.getPlayerLoopMode(player.id) || 2;
-      await PlayersAPI.setLoopMode(player.id, loopMode);
-      return PlayersAPI.playMedia(player.id, fileUrl);
-    })
-  );
+  // Запускаем плееры последовательно с задержкой для предотвращения перегрузки
+  let successful = 0;
+  let failed = 0;
 
-  const successful = results.filter(r => r.status === 'fulfilled').length;
-  addMessage(`Запущено: ${successful} плееров`, 'success');
+  for (const player of playersWithSelection) {
+    try {
+      const fileUrl = appState.getPlayerSelection(player.id);
+      const loopMode = appState.getPlayerLoopMode(player.id) || 2;
+
+      // Устанавливаем loop mode
+      await PlayersAPI.setLoopMode(player.id, loopMode);
+
+      // Небольшая пауза перед воспроизведением
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Запускаем воспроизведение
+      await PlayersAPI.playMedia(player.id, fileUrl);
+      successful++;
+
+      // Пауза перед следующим плеером (если не последний)
+      if (player !== playersWithSelection[playersWithSelection.length - 1]) {
+        await new Promise(resolve => setTimeout(resolve, 150));
+      }
+    } catch (error) {
+      failed++;
+      console.error(`Ошибка запуска плеера ${player.id}:`, error);
+    }
+  }
+
+  if (successful > 0) {
+    addMessage(`Запущено: ${successful} плееров`, 'success');
+  }
+  if (failed > 0) {
+    addMessage(`Ошибка на ${failed} плеерах`, 'error');
+  }
 
   // Обновляем статусы всех плееров
   await refreshAllPlayers();
@@ -133,20 +156,6 @@ export async function refreshAllPlayers() {
   // Обновляем UI после получения статусов
   if (window.renderMultiPlayers) {
     window.renderMultiPlayers();
-  }
-}
-
-/**
- * Установить громкость для плеера
- * @param {string} playerId - ID плеера
- * @param {number} volume - уровень громкости (0-100)
- */
-export async function setVolume(playerId, volume) {
-  try {
-    await PlayersAPI.setVolume(playerId, volume);
-    appState.setPlayerVolume(playerId, volume);
-  } catch (error) {
-    addMessage(`Ошибка установки громкости: ${error.message}`, 'error');
   }
 }
 

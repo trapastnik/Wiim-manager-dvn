@@ -53,6 +53,9 @@ class AppState {
       useWiimNativeLoop: true,     // Технология 1: Встроенный WiiM loopMode API
       useClientMonitoring: false   // Технология 2: Клиентский мониторинг и автоперезапуск
     };
+
+    // UI настройки
+    this.messagesPanelWidth = 350; // Ширина панели сообщений
   }
 
   // === Геттеры и сеттеры для основных данных ===
@@ -185,6 +188,16 @@ class AppState {
 
   getViewMode() {
     return this.viewMode;
+  }
+
+  // === UI настройки ===
+
+  getMessagesPanelWidth() {
+    return this.messagesPanelWidth;
+  }
+
+  setMessagesPanelWidth(width) {
+    this.messagesPanelWidth = width;
   }
 
   // === Сброс состояния ===

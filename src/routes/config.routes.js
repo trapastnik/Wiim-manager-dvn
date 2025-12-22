@@ -32,5 +32,35 @@ export function createConfigRouter(storage, statsService) {
     configController.resetServerStats(req, res, statsService)
   );
 
+  // Синхронизация конфигурации (playerSelections, groups, volumes)
+  router.post('/sync', (req, res) =>
+    configController.syncConfig(req, res, storage)
+  );
+
+  // Сохранить loop modes
+  router.post('/loop-modes', (req, res) =>
+    configController.saveLoopModes(req, res, storage)
+  );
+
+  // Сохранить настройки приложения
+  router.post('/settings', (req, res) =>
+    configController.saveSettings(req, res, storage)
+  );
+
+  // Сохранить ширину панели
+  router.post('/panel-width', (req, res) =>
+    configController.savePanelWidth(req, res, storage)
+  );
+
+  // Сохранить экспериментальные настройки loop
+  router.post('/loop-experimental', (req, res) =>
+    configController.saveLoopExperimentalSettings(req, res, storage)
+  );
+
+  // Очистка битых состояний
+  router.post('/cleanup', (req, res) =>
+    configController.cleanupBrokenStates(req, res, storage)
+  );
+
   return router;
 }

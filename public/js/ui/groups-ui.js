@@ -129,7 +129,7 @@ export async function playGroup(groupId) {
   addMessage(`Синхронный запуск группы "${group.name}" (${playersWithFiles.length} плееров)...`, 'info');
 
   try {
-    // Запускаем все плееры группы параллельно
+    // Запускаем все плееры группы ПАРАЛЛЕЛЬНО для синхронности (обычно 2-3 плеера)
     await Promise.all(
       playersWithFiles.map(async playerId => {
         const fileUrl = appState.getPlayerSelection(playerId);
@@ -156,13 +156,23 @@ export async function playGroup(groupId) {
  */
 export function renderPlayerGroups() {
   const container = getElement('player-groups-list');
+  const groupManagement = document.querySelector('.group-management');
   if (!container) return;
 
   const groups = appState.getPlayerGroups();
 
   if (groups.length === 0) {
     setHTML('player-groups-list', '<p class="empty-state">Нет групп. Выберите плееры и создайте группу.</p>');
+    // Добавляем класс empty для уменьшения высоты блока
+    if (groupManagement) {
+      groupManagement.classList.add('empty');
+    }
     return;
+  }
+
+  // Убираем класс empty если есть группы
+  if (groupManagement) {
+    groupManagement.classList.remove('empty');
   }
 
   const html = groups.map(group => `
@@ -182,18 +192,27 @@ export function renderPlayerGroups() {
 }
 
 /**
- * Загрузить группы с сервера
+ * Загрузить группы с сервера или из переданных данных
+ * @param {Array} playerGroups - массив групп (опционально)
  */
-export async function loadPlayerGroups() {
-  if (window.ConfigAPI) {
-    try {
+export async function loadPlayerGroups(playerGroups = null) {
+  try {
+    // Если группы переданы, используем их (избегаем дублирующего запроса)
+    if (playerGroups) {
+      appState.setPlayerGroups(playerGroups);
+      renderPlayerGroups();
+      return;
+    }
+
+    // Иначе загружаем с сервера (только если вызывается отдельно)
+    if (window.ConfigAPI) {
       const config = await window.ConfigAPI.getConfig();
       if (config.playerGroups) {
         appState.setPlayerGroups(config.playerGroups);
         renderPlayerGroups();
       }
-    } catch (error) {
-      console.error('Ошибка загрузки групп:', error);
     }
+  } catch (error) {
+    console.error('Ошибка загрузки групп:', error);
   }
 }

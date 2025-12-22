@@ -419,6 +419,53 @@ class Storage {
     config.loopExperimentalSettings = loopExperimentalSettings;
     return this.saveUIConfig(config);
   }
+
+  // ================================================
+  // ОБЩИЕ МЕТОДЫ ДЛЯ ПОЛУЧЕНИЯ/СОХРАНЕНИЯ ВСЕЙ КОНФИГУРАЦИИ
+  // ================================================
+
+  // Получить всю конфигурацию (playback + UI)
+  getConfig() {
+    const playbackConfig = this.getPlaybackConfig();
+    const uiConfig = this.getUIConfig();
+
+    return {
+      playerSelections: playbackConfig.playerSelections,
+      playerGroups: playbackConfig.playerGroups,
+      playerLoopModes: uiConfig.playerLoopModes,
+      playerVolumes: uiConfig.playerVolumes,
+      appSettings: uiConfig.appSettings,
+      messagesPanelWidth: uiConfig.messagesPanelWidth,
+      loopExperimentalSettings: uiConfig.loopExperimentalSettings,
+      lastUpdated: new Date().toISOString()
+    };
+  }
+
+  // Сохранить всю конфигурацию
+  saveConfig(config) {
+    // Сохраняем playback конфигурацию
+    if (config.playerSelections !== undefined || config.playerGroups !== undefined) {
+      this.savePlaybackConfig(
+        config.playerSelections || {},
+        config.playerGroups || []
+      );
+    }
+
+    // Сохраняем UI конфигурацию
+    const uiConfig = {};
+    if (config.playerLoopModes !== undefined) uiConfig.playerLoopModes = config.playerLoopModes;
+    if (config.playerVolumes !== undefined) uiConfig.playerVolumes = config.playerVolumes;
+    if (config.appSettings !== undefined) uiConfig.appSettings = config.appSettings;
+    if (config.messagesPanelWidth !== undefined) uiConfig.messagesPanelWidth = config.messagesPanelWidth;
+    if (config.loopExperimentalSettings !== undefined) uiConfig.loopExperimentalSettings = config.loopExperimentalSettings;
+
+    if (Object.keys(uiConfig).length > 0) {
+      const currentUIConfig = this.getUIConfig();
+      this.saveUIConfig({ ...currentUIConfig, ...uiConfig });
+    }
+
+    return true;
+  }
 }
 
 export default new Storage();

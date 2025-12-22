@@ -2,9 +2,8 @@
   "playerLoopModes": {},
   "playerVolumes": {},
   "appSettings": {
-    "beepSoundUrl": "default",
-    "viewMode": "simple"
+    "viewMode": "advanced"
   },
-  "messagesPanelWidth": 450,
-  "lastUpdated": "2025-12-20T14:08:51.698Z"
+  "messagesPanelWidth": 537,
+  "lastUpdated": "2025-12-22T06:33:54.982Z"
 }

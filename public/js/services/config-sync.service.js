@@ -30,6 +30,9 @@ export function savePlayerSelections() {
       console.log('[CONFIG-SYNC] Player selections saved');
     } catch (error) {
       console.error('[CONFIG-SYNC] Error saving player selections:', error);
+      if (window.addMessage) {
+        window.addMessage('⚠️ Не удалось сохранить выбор файлов', 'error');
+      }
     }
   }, 300);
 }
@@ -52,6 +55,9 @@ export function saveLoopModes() {
       console.log('[CONFIG-SYNC] Loop modes saved');
     } catch (error) {
       console.error('[CONFIG-SYNC] Error saving loop modes:', error);
+      if (window.addMessage) {
+        window.addMessage('⚠️ Не удалось сохранить Loop режимы', 'error');
+      }
     }
   }, 300);
 }
@@ -76,6 +82,9 @@ export function saveVolumes() {
       console.log('[CONFIG-SYNC] Player volumes saved');
     } catch (error) {
       console.error('[CONFIG-SYNC] Error saving player volumes:', error);
+      if (window.addMessage) {
+        window.addMessage('⚠️ Не удалось сохранить громкости', 'error');
+      }
     }
   }, 300);
 }
@@ -97,5 +106,23 @@ export async function savePlayerGroups() {
     console.log('[CONFIG-SYNC] Player groups saved');
   } catch (error) {
     console.error('[CONFIG-SYNC] Error saving player groups:', error);
+    if (window.addMessage) {
+      window.addMessage('⚠️ Не удалось сохранить группы плееров', 'error');
+    }
+  }
+}
+
+/**
+ * Сохранить ширину панели сообщений
+ */
+export async function saveMessagesPanelWidth(width) {
+  // В демо-режиме не сохраняем
+  if (appState.isDemoModeEnabled()) return;
+
+  try {
+    await ConfigAPI.saveMessagesPanelWidth(width);
+    console.log('[CONFIG-SYNC] Messages panel width saved:', width);
+  } catch (error) {
+    console.error('[CONFIG-SYNC] Error saving panel width:', error);
   }
 }
