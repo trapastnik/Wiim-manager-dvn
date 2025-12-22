@@ -39,7 +39,12 @@
       "Bash(then)",
       "Bash(echo:*)",
       "Bash(else)",
-      "Bash(fi)"
+      "Bash(fi)",
+      "Bash(git stash show:*)",
+      "Bash(git stash:*)",
+      "Bash(git rev-list:*)",
+      "Bash(git rebase:*)",
+      "Bash(git reset:*)"
     ],
     "deny": [],
     "ask": []
