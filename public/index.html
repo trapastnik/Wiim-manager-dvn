@@ -3,33 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WiiM Control Center</title>
+    <title>Управление звуком музея ОБЭРИУ</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="main-layout">
-        <div class="container">
-            <header>
-                <h1>WiiM Control Center</h1>
-                <div class="header-controls">
-                    <button id="view-mode-toggle" class="btn btn-secondary" onclick="toggleViewMode()">
-                        <span id="view-mode-icon">🔧</span> <span id="view-mode-text">Простой режим</span>
-                    </button>
-                    <button id="enable-demo-btn" class="btn btn-demo" onclick="enableDemoMode(); startDemoAnimation()">🎭 Демо-режим</button>
-                    <button id="disable-demo-btn" class="btn btn-demo-exit" onclick="disableDemoMode()" style="display:none">✕ Выйти из демо</button>
-                    <div id="connection-status" class="status offline">●</div>
-                </div>
-            </header>
-
-            <!-- Табы -->
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('player')">Плеер</button>
-                <button class="tab" onclick="switchTab('players')">Устройства</button>
-                <button class="tab" onclick="switchTab('media')">Медиа</button>
-                <button class="tab" onclick="switchTab('diagnostics')">Диагностика</button>
-                <button class="tab" onclick="switchTab('settings')">⚙️ Настройки</button>
+        <!-- Sticky Header вне контейнера -->
+        <header class="sticky-header">
+            <h1>Управление звуком музея ОБЭРИУ</h1>
+            <div class="header-controls">
+                <button id="view-mode-toggle" class="btn btn-secondary" onclick="toggleViewMode()">
+                    <span id="view-mode-icon">🔧</span> <span id="view-mode-text">Простой режим</span>
+                </button>
+                <button id="enable-demo-btn" class="btn btn-demo" onclick="enableDemoMode(); startDemoAnimation()">🎭 Демо-режим</button>
+                <button id="disable-demo-btn" class="btn btn-demo-exit" onclick="disableDemoMode()" style="display:none">✕ Выйти из демо</button>
+                <div id="connection-status" class="status offline">●</div>
             </div>
+        </header>
 
+        <!-- Sticky Tabs вне контейнера -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('player')">Плеер</button>
+            <button class="tab" onclick="switchTab('players')">Устройства</button>
+            <button class="tab" onclick="switchTab('media')">Медиа</button>
+            <button class="tab" onclick="switchTab('diagnostics')">Диагностика</button>
+            <button class="tab" onclick="switchTab('settings')">⚙️ Настройки</button>
+        </div>
+
+        <!-- Main content area with sidebar -->
+        <div class="content-wrapper">
+            <div class="container">
         <!-- Вкладка: Плеер -->
         <div id="tab-player" class="tab-content active">
             <!-- Глобальные кнопки управления -->
@@ -39,29 +42,33 @@
                 <button class="btn btn-primary" onclick="refreshAllPlayers()">🔄 Обновить статусы</button>
             </div>
 
-            <!-- Панель Loop Mode (только в расширенном режиме) -->
-            <div class="loop-mode-panel advanced-only" style="display:none;">
-                <h3>🔁 Режим повтора треков</h3>
-                <div class="loop-mode-description">
-                    <p><strong>WiiM Native Loop</strong> - устройство само повторяет треки. Надёжно, работает даже при отключении браузера.</p>
+            <!-- Компактная панель с группами и Loop Mode -->
+            <div class="compact-controls-panel">
+                <!-- Управление группами -->
+                <div class="group-management compact">
+                    <div class="compact-header">
+                        <h3>📁 Группы плееров</h3>
+                        <div class="group-actions">
+                            <button class="btn btn-success btn-small" onclick="createPlayerGroup()" id="create-group-btn" disabled>✓ Создать</button>
+                            <button class="btn btn-secondary btn-small" onclick="clearPlayerSelection()" id="clear-selection-btn" style="display:none">✕ Сбросить</button>
+                        </div>
+                    </div>
+                    <div id="player-groups-list" class="player-groups-list compact">
+                        <p class="empty-state">Нет групп. Выберите плееры и создайте группу.</p>
+                    </div>
                 </div>
-                <div class="loop-mode-controls">
-                    <button id="native-loop-btn" class="btn btn-secondary" onclick="toggleNativeLoop()">
-                        🔁 Native Loop: OFF
-                    </button>
-                    <span class="loop-mode-hint">Применяется ко всем плеерам</span>
-                </div>
-            </div>
 
-            <!-- Управление группами -->
-            <div class="group-management">
-                <h3>📁 Группы плееров</h3>
-                <div class="group-actions">
-                    <button class="btn btn-success" onclick="createPlayerGroup()" id="create-group-btn" disabled>✓ Создать группу</button>
-                    <button class="btn btn-secondary" onclick="clearPlayerSelection()" id="clear-selection-btn" style="display:none">✕ Сбросить выбор</button>
-                </div>
-                <div id="player-groups-list" class="player-groups-list">
-                    <p class="empty-state">Нет сохранённых групп. Выберите плееры галочками и создайте группу.</p>
+                <!-- Панель Loop Mode (только в расширенном режиме) -->
+                <div class="loop-mode-panel compact advanced-only" style="display:none;">
+                    <div class="compact-header">
+                        <h3>🔁 Loop Mode</h3>
+                        <button id="native-loop-btn" class="btn btn-secondary btn-small" onclick="toggleNativeLoop()">
+                            🔁 OFF
+                        </button>
+                    </div>
+                    <div class="loop-mode-description compact">
+                        <p>WiiM Native Loop - устройство само повторяет треки</p>
+                    </div>
                 </div>
             </div>
 
@@ -179,16 +186,16 @@
             </div>
         </div>
         </div>
+            <!-- Боковая панель системных сообщений -->
+            <div class="messages-panel" id="messages-panel">
+                <div class="resize-handle" id="resize-handle"></div>
+                <div class="messages-header">
+                    <h2>📝 Системные сообщения</h2>
+                </div>
 
-        <!-- Боковая панель системных сообщений -->
-        <div class="messages-panel" id="messages-panel">
-            <div class="resize-handle" id="resize-handle"></div>
-            <div class="messages-header">
-                <h2>📝 Системные сообщения</h2>
-            </div>
-
-            <div class="system-messages" id="system-messages">
-                <div class="message-item">Ожидание подключения...</div>
+                <div class="system-messages" id="system-messages">
+                    <div class="message-item">Ожидание подключения...</div>
+                </div>
             </div>
         </div>
     </div>

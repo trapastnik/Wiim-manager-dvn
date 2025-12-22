@@ -97,7 +97,7 @@ export function enableDemoMode() {
   // Обновляем заголовок
   const header = document.querySelector('header h1');
   if (header) {
-    header.innerHTML = 'WiiM Control Center <span style="color:#ef4444;font-size:14px;vertical-align:super">ДЕМО</span>';
+    header.innerHTML = 'Управление звуком музея ОБЭРИУ <span style="color:#ef4444;font-size:14px;vertical-align:super">ДЕМО</span>';
   }
 
   // Показываем/скрываем кнопки
@@ -121,7 +121,7 @@ export function disableDemoMode() {
   // Восстанавливаем заголовок
   const header = document.querySelector('header h1');
   if (header) {
-    header.textContent = 'WiiM Control Center';
+    header.textContent = 'Управление звуком музея ОБЭРИУ';
   }
 
   // Показываем/скрываем кнопки

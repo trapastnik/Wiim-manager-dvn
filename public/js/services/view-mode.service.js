@@ -19,6 +19,11 @@ export async function toggleViewMode() {
   // Показываем/скрываем панель сообщений
   toggleMessagesPanel(newMode);
 
+  // Перерисовываем карточки плееров с новым режимом
+  if (window.renderMultiPlayers) {
+    window.renderMultiPlayers();
+  }
+
   // Уведомление
   addMessage(`${newMode === 'simple' ? '📱 Простой режим' : '🔧 Расширенный режим'} активирован`, 'info');
 
@@ -66,7 +71,7 @@ function toggleMessagesPanel(mode) {
     if (mode === 'simple') {
       panel.style.display = 'none';
     } else {
-      panel.style.display = 'block';
+      panel.style.display = 'flex';
     }
   }
 
@@ -77,6 +82,16 @@ function toggleMessagesPanel(mode) {
       el.style.display = 'none';
     } else {
       el.style.display = 'block';
+    }
+  });
+
+  // Переключаем класс simple-mode на всех карточках плееров
+  const playerCards = document.querySelectorAll('.player-control-card');
+  playerCards.forEach(card => {
+    if (mode === 'simple') {
+      card.classList.add('simple-mode');
+    } else {
+      card.classList.remove('simple-mode');
     }
   });
 }

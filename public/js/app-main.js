@@ -80,7 +80,6 @@ window.playMediaOnAllPlayers = PlayerService.playMediaOnAllPlayers;
 window.stopAll = PlayerService.stopAll;
 window.playAll = PlayerService.playAll;
 window.refreshAllPlayers = PlayerService.refreshAllPlayers;
-window.setVolume = PlayerService.setVolume;
 window.setLoopMode = PlayerService.setLoopMode;
 window.playPlayer = PlayerService.playPlayer;
 window.stopPlayer = PlayerService.stopPlayer;
@@ -172,10 +171,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.log('[CONFIG] Player volumes restored');
     }
 
+    if (config.messagesPanelWidth) {
+      appState.setMessagesPanelWidth(config.messagesPanelWidth);
+      console.log('[CONFIG] Messages panel width restored:', config.messagesPanelWidth);
+    }
+
     // Загружаем данные
     await loadPlayers();
     await loadMedia();
-    await loadPlayerGroups();
+    await loadPlayerGroups(config.playerGroups); // Передаём уже загруженные группы
     await refreshAllPlayers();
 
     // Запускаем автообновление
@@ -189,7 +193,106 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error('Ошибка инициализации:', error);
     addMessage(`Ошибка инициализации: ${error.message}`, 'error');
   }
+
+  // Инициализация изменяемой ширины панелей
+  initResizablePanels();
+
+  // Инициализация sticky header с компактным режимом при скролле
+  initStickyHeader();
 });
+
+/**
+ * Инициализация изменяемой ширины панелей
+ */
+function initResizablePanels() {
+  const resizeHandle = document.getElementById('resize-handle');
+  const messagesPanel = document.getElementById('messages-panel');
+  const container = document.querySelector('.container');
+
+  if (!resizeHandle || !messagesPanel || !container) return;
+
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  // Загружаем сохранённую ширину из конфига
+  const savedWidth = appState.getMessagesPanelWidth();
+  if (savedWidth) {
+    messagesPanel.style.width = savedWidth + 'px';
+  }
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = messagesPanel.offsetWidth;
+
+    // Добавляем класс для визуального эффекта
+    resizeHandle.style.background = 'rgba(102, 126, 234, 0.5)';
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
+
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+
+    // Вычисляем новую ширину (панель справа: двигаем влево - панель расширяется)
+    const deltaX = e.clientX - startX;
+    const newWidth = Math.max(250, Math.min(800, startWidth - deltaX));
+
+    messagesPanel.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', async () => {
+    if (!isResizing) return;
+
+    isResizing = false;
+    resizeHandle.style.background = '';
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+
+    // Сохраняем новую ширину
+    const newWidth = messagesPanel.offsetWidth;
+    appState.setMessagesPanelWidth(newWidth);
+
+    // Сохраняем на сервер
+    try {
+      await ConfigSync.saveMessagesPanelWidth(newWidth);
+      console.log('[RESIZE] Messages panel width saved:', newWidth);
+    } catch (error) {
+      console.error('[RESIZE] Error saving panel width:', error);
+    }
+  });
+}
+
+/**
+ * Инициализация sticky header с компактным режимом при скролле
+ */
+function initStickyHeader() {
+  const container = document.querySelector('.container');
+  const header = document.querySelector('header.sticky-header');
+  const tabs = document.querySelector('.tabs');
+
+  if (!container || !header || !tabs) return;
+
+  let lastScrollTop = 0;
+
+  container.addEventListener('scroll', () => {
+    const scrollTop = container.scrollTop;
+
+    // Добавляем класс scrolled при скролле вниз больше 50px
+    if (scrollTop > 50) {
+      header.classList.add('scrolled');
+      tabs.classList.add('scrolled');
+    } else {
+      header.classList.remove('scrolled');
+      tabs.classList.remove('scrolled');
+    }
+
+    lastScrollTop = scrollTop;
+  });
+}
 
 // Экспортируем для использования в других модулях
 export {

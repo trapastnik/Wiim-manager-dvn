@@ -73,11 +73,11 @@ export function updateLoopModeUI() {
   const isActive = getNativeLoopState();
 
   if (isActive) {
-    nativeBtn.textContent = '🔁 Native Loop: ON';
+    nativeBtn.innerHTML = '🔁 ON';
     nativeBtn.classList.remove('btn-secondary');
     nativeBtn.classList.add('btn-success');
   } else {
-    nativeBtn.textContent = '🔁 Native Loop: OFF';
+    nativeBtn.innerHTML = '🔁 OFF';
     nativeBtn.classList.remove('btn-success');
     nativeBtn.classList.add('btn-secondary');
   }
