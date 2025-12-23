@@ -79,7 +79,7 @@ export async function syncConfig(data = {}) {
  * @returns {Promise<Object>}
  */
 export async function getServerInfo() {
-  return await get('/api/server-info');
+  return await get('/api/config/server-info');
 }
 
 /**
