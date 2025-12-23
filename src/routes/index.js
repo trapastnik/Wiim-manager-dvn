@@ -22,7 +22,7 @@ export function createApiRouter(dependencies) {
   router.use('/players', createPlayersRouter(wiimClient, storage));
   router.use('/media', createMediaRouter(storage));
   router.use('/config', createConfigRouter(storage, statsService));
-  router.use('/scanner', createScannerRouter(networkScanner));
+  router.use('/scanner', createScannerRouter(networkScanner, storage));
 
   return router;
 }

@@ -48,8 +48,8 @@ export function renderMedia(files) {
         <div class="filesize">${formatFileSize(file.size)}</div>
       </div>
       <div class="media-actions">
-        <button class="btn btn-success" onclick="playMediaFile('${file.path}', '${file.name}')">▶ Играть</button>
-        <button class="btn btn-danger" onclick="deleteMediaFile('${file.filename}', '${file.name}')">🗑 Удалить</button>
+        <button class="btn btn-success" onclick="playMediaFile('${file.url}', '${file.name}')">▶ Играть</button>
+        <button class="btn btn-danger" onclick="deleteMediaFile('${file.name}', '${file.name}')">🗑 Удалить</button>
       </div>
     </div>
   `).join('');

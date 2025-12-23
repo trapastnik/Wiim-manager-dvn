@@ -4,12 +4,12 @@ import * as scannerController from '../controllers/scanner.controller.js';
 /**
  * Маршруты для сканирования сети
  */
-export function createScannerRouter(networkScanner) {
+export function createScannerRouter(networkScanner, storage) {
   const router = express.Router();
 
   // Сканировать сеть на наличие WiiM устройств
   router.post('/scan', (req, res) =>
-    scannerController.scanNetwork(req, res, networkScanner)
+    scannerController.scanNetwork(req, res, networkScanner, storage)
   );
 
   // Получить прогресс сканирования
