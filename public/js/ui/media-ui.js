@@ -13,7 +13,7 @@ import { getElement, setHTML, setInputValue } from '../utils/dom.js';
  */
 export async function loadMedia() {
   try {
-    const { files } = await MediaAPI.getMediaFiles();
+    const files = await MediaAPI.getMediaFiles();
     console.log('Загружены медиа файлы:', files);
     appState.setMediaFiles(files || []);
     renderMedia(files || []);

@@ -1,8 +1,31 @@
 import https from 'https';
+import { networkInterfaces } from 'os';
 
 class NetworkScanner {
-  constructor(subnet = '192.168.1') {
-    this.subnet = subnet;
+  constructor(subnet = null) {
+    this.subnet = subnet || this.detectSubnet();
+  }
+
+  // Автоопределение подсети на основе локальных IP адресов сервера
+  detectSubnet() {
+    const interfaces = networkInterfaces();
+
+    for (const iface of Object.values(interfaces)) {
+      for (const addr of iface) {
+        // Ищем IPv4 адрес, не loopback
+        if (addr.family === 'IPv4' && !addr.internal) {
+          // Извлекаем первые 3 октета (подсеть)
+          const parts = addr.address.split('.');
+          const subnet = `${parts[0]}.${parts[1]}.${parts[2]}`;
+          console.log(`[SCANNER] Автоопределена подсеть: ${subnet}.0/24`);
+          return subnet;
+        }
+      }
+    }
+
+    // Fallback на стандартную подсеть
+    console.log('[SCANNER] Не удалось определить подсеть, используется 192.168.0');
+    return '192.168.0';
   }
 
   // Проверка одного IP на наличие WiiM устройства

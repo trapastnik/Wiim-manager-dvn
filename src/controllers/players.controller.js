@@ -22,7 +22,8 @@ export async function addPlayer(req, res, storage) {
       return res.status(400).json({ error: 'IP адрес обязателен' });
     }
 
-    const players = await storage.getPlayers();
+    const data = await storage.getPlayers();
+    const players = data.players || [];
 
     // Проверка на дубликаты
     if (players.some(p => p.ip === ip)) {
@@ -50,7 +51,8 @@ export async function addPlayer(req, res, storage) {
 export async function removePlayer(req, res, storage) {
   try {
     const { id } = req.params;
-    const players = await storage.getPlayers();
+    const data = await storage.getPlayers();
+    const players = data.players || [];
     const filteredPlayers = players.filter(p => p.id !== id);
 
     if (filteredPlayers.length === players.length) {

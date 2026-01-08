@@ -17,11 +17,6 @@ export function createPlayersRouter(wiimClient, storage) {
     playersController.addPlayer(req, res, storage)
   );
 
-  // Удалить плеер
-  router.delete('/:id', (req, res) =>
-    playersController.removePlayer(req, res, storage)
-  );
-
   // Получить статус плеера
   router.get('/:ip/status', (req, res) =>
     playersController.getPlayerStatus(req, res, wiimClient)
@@ -55,6 +50,11 @@ export function createPlayersRouter(wiimClient, storage) {
   // Воспроизвести beep
   router.post('/:ip/beep', (req, res) =>
     playersController.playBeep(req, res, wiimClient)
+  );
+
+  // Удалить плеер (должен быть ПОСЛЕ всех специфичных роутов)
+  router.delete('/:id', (req, res) =>
+    playersController.removePlayer(req, res, storage)
   );
 
   return router;
